@@ -4,12 +4,14 @@ import { ChatPreviewSection } from "./ChatPreviewSection";
 import { ConversationTypesSection } from "./ConversationTypesSection";
 import { RealtimeShowcase } from "./RealtimeShowcase";
 import { FeatureSection } from "./FeatureSection";
+import { CTASection } from "./CTASection";
 import {
   heroContent,
   chatPreviewContent,
   conversationTypesContent,
   realtimeShowcaseContent,
   featureSectionContent,
+  ctaSectionContent,
 } from "@/lib/landingContent";
 
 // composition root for "/" — more sections (testimonials, footer, etc.) get
@@ -24,6 +26,7 @@ export function LandingPage() {
       <ConversationTypesSection {...conversationTypesContent} />
       <RealtimeShowcase {...realtimeShowcaseContent} />
       <FeatureSection {...featureSectionContent} />
+      <CTASection {...ctaSectionContent} />
     </main>
   );
 }

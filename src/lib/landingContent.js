@@ -275,3 +275,17 @@ export const realtimeShowcaseContent = {
     time: "11:06 AM",
   },
 };
+
+/**
+ * @typedef {Object} CTASectionContent
+ * @property {string} title
+ * @property {string} description
+ * @property {{label: string, href: string}} cta
+ */
+
+/** @type {CTASectionContent} */
+export const ctaSectionContent = {
+  title: "Ready to start a conversation?",
+  description: "Jump into a fast, simple messaging experience built for people and teams.",
+  cta: { label: "Start Chatting", href: "/login" },
+};
