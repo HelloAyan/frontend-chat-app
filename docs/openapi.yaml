@@ -66,6 +66,12 @@ info:
       the next page, instead of starting strictly after it. Harmless if the
       caller dedupes by `_id` when stitching pages together, which is worth
       doing regardless since it's an easy thing to miss.
+    - the `message:new` socket payload doesn't match the REST `Message`
+      shape for the same message: the id field is `id`, not `_id`, and
+      `createdAt` is a numeric epoch timestamp instead of an ISO string.
+      Confirmed by sending a message over REST and listening for the socket
+      event on the other side. Worth normalizing on receipt if the rest of
+      the app treats REST-fetched and socket-delivered messages the same way.
 
     Given the choice I'd probably put groups under their own `/groups`
     resource instead of nesting everything under `/conversations`, and have

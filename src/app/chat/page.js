@@ -9,7 +9,9 @@ import { ChatPanel } from "@/components/chat/ChatPanel";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { useGetConversationsQuery, useStartConversationMutation, conversationsApi } from "@/features/conversations/api";
 import { useGetMessagesInfiniteQuery, useSendMessageMutation } from "@/features/messages/api";
+import { useMessageSocket } from "@/features/messages/hooks";
 import { MOCK_USERS } from "@/lib/mockChatData";
+import { getTokenCookie } from "@/lib/cookies";
 import { cn } from "@/lib/cn";
 
 // Creating a group and sending a message are still mock/local (their own
@@ -150,13 +152,36 @@ export default function ChatPage() {
     );
   }
 
+  // idempotent by message id: a message this tab just sent over REST also
+  // comes back over the socket a moment later (the server broadcasts every
+  // new message, including the sender's own), so the second arrival needs
+  // to be a no-op instead of a duplicate bubble
   function appendMessage(conversationId, message) {
-    setMessagesByConversation((prev) => ({
-      ...prev,
-      [conversationId]: [...(prev[conversationId] ?? []), message],
-    }));
+    setMessagesByConversation((prev) => {
+      const existing = prev[conversationId] ?? [];
+      if (existing.some((m) => m._id === message._id)) return prev;
+      return { ...prev, [conversationId]: [...existing, message] };
+    });
     updateConversationPreview(conversationId, message);
   }
+
+  // a message for a conversation we don't know about yet (someone just
+  // started chatting with us, or added us to a group) can't be reconstructed
+  // from the bare message payload alone, so this just pulls the full list
+  // again instead
+  function handleIncomingMessage(message) {
+    const conversationId = message.conversation;
+    const isKnownConversation = conversations.some((c) => c._id === conversationId);
+
+    if (!isKnownConversation) {
+      dispatch(conversationsApi.util.invalidateTags(["Conversation"]));
+      return;
+    }
+
+    appendMessage(conversationId, message);
+  }
+
+  useMessageSocket(currentUser ? getTokenCookie() : null, handleIncomingMessage);
 
   async function handleSendMessage(text) {
     if (!activeConversation || !currentUser) return;
