@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useDispatch } from "react-redux";
 import toast from "react-hot-toast";
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { useCurrentUser } from "@/features/auth/hooks";
-import { useGetConversationsQuery, useStartConversationMutation } from "@/features/conversations/api";
-import { useGetMessagesInfiniteQuery } from "@/features/messages/api";
+import { useGetConversationsQuery, useStartConversationMutation, conversationsApi } from "@/features/conversations/api";
+import { useGetMessagesInfiniteQuery, useSendMessageMutation } from "@/features/messages/api";
 import { MOCK_USERS } from "@/lib/mockChatData";
 import { cn } from "@/lib/cn";
 
@@ -26,6 +27,8 @@ export default function ChatPage() {
     refetch: refetchConversations,
   } = useGetConversationsQuery();
   const [startConversation] = useStartConversationMutation();
+  const [sendMessage] = useSendMessageMutation();
+  const dispatch = useDispatch();
 
   const [localConversations, setLocalConversations] = useState([]);
   const [messagesByConversation, setMessagesByConversation] = useState({});
@@ -64,7 +67,13 @@ export default function ChatPage() {
     const fetched = messagesPages
       ? Array.from(new Map(messagesPages.pages.flatMap((page) => page.messages).map((m) => [m._id, m])).values()).reverse()
       : [];
-    const raw = isMockOnlyConversation ? localOnly : [...fetched, ...localOnly];
+    // a message just sent through appendMessage() below lives here under
+    // its real id until the next full refetch brings it back through
+    // `fetched` too, drop the local copy once that happens so it isn't
+    // shown twice
+    const fetchedIds = new Set(fetched.map((m) => m._id));
+    const stillLocalOnly = localOnly.filter((m) => !fetchedIds.has(m._id));
+    const raw = isMockOnlyConversation ? localOnly : [...fetched, ...stillLocalOnly];
 
     if (activeConversation.type !== "group") return raw;
 
@@ -118,29 +127,64 @@ export default function ChatPage() {
     setActiveId(newGroup._id);
   }
 
-  function handleSendMessage(text) {
-    if (!activeConversation || !currentUser) return;
+  // updates wherever this conversation's preview line lives: the RTK Query
+  // cache if it came from GET /conversations, the local overlay if it's
+  // still only known client-side (e.g. a just-started chat before its
+  // refetch lands). harmless to do both, the merge above always prefers
+  // whichever one is real.
+  function updateConversationPreview(conversationId, message) {
+    const preview = { text: message.text, sender: message.sender, createdAt: message.createdAt };
 
-    const message = {
-      _id: `local-msg-${Date.now()}`,
-      conversation: activeConversation._id,
-      sender: currentUser._id,
-      text,
-      createdAt: new Date().toISOString(),
-    };
-
-    setMessagesByConversation((prev) => ({
-      ...prev,
-      [activeConversation._id]: [...(prev[activeConversation._id] ?? []), message],
-    }));
+    dispatch(
+      conversationsApi.util.updateQueryData("getConversations", undefined, (draft) => {
+        const conversation = draft.find((c) => c._id === conversationId);
+        if (conversation) {
+          conversation.lastMessage = preview;
+          conversation.updatedAt = message.createdAt;
+        }
+      }),
+    );
 
     setLocalConversations((prev) =>
-      prev.map((c) =>
-        c._id === activeConversation._id
-          ? { ...c, lastMessage: { text, sender: currentUser._id, createdAt: message.createdAt }, updatedAt: message.createdAt }
-          : c,
-      ),
+      prev.map((c) => (c._id === conversationId ? { ...c, lastMessage: preview, updatedAt: message.createdAt } : c)),
     );
+  }
+
+  function appendMessage(conversationId, message) {
+    setMessagesByConversation((prev) => ({
+      ...prev,
+      [conversationId]: [...(prev[conversationId] ?? []), message],
+    }));
+    updateConversationPreview(conversationId, message);
+  }
+
+  async function handleSendMessage(text) {
+    if (!activeConversation || !currentUser) return;
+
+    if (isMockOnlyConversation) {
+      appendMessage(activeConversation._id, {
+        _id: `local-msg-${Date.now()}`,
+        conversation: activeConversation._id,
+        sender: currentUser._id,
+        text,
+        createdAt: new Date().toISOString(),
+      });
+      return;
+    }
+
+    try {
+      const result = await sendMessage({ conversationId: activeConversation._id, text }).unwrap();
+      if (!result) {
+        // documented API quirk: an unknown conversationId gets a 200 with a
+        // null body instead of an error. shouldn't happen for a
+        // conversation that's already open, but the frontend can't assume
+        // it never will
+        throw new Error("Message couldn't be sent, please try again.");
+      }
+      appendMessage(activeConversation._id, result);
+    } catch (err) {
+      toast.error(err.message || "Couldn't send that message, please try again.");
+    }
   }
 
   return (

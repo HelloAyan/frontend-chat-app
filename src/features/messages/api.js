@@ -22,7 +22,15 @@ export const messagesApi = createApi({
       }),
       providesTags: (result, error, conversationId) => [{ type: "Message", id: conversationId }],
     }),
+    // no invalidatesTags here on purpose: refreshing the whole infinite
+    // query on every send would refetch every page already loaded and
+    // fight with the scroll-position logic in MessageList. the sent
+    // message (which this returns in full, real id included) gets merged
+    // into the view locally instead, see chat/page.js.
+    sendMessage: builder.mutation({
+      query: ({ conversationId, text }) => ({ url: "/messages", method: "POST", body: { conversationId, text } }),
+    }),
   }),
 });
 
-export const { useGetMessagesInfiniteQuery } = messagesApi;
+export const { useGetMessagesInfiniteQuery, useSendMessageMutation } = messagesApi;
