@@ -99,3 +99,64 @@ export const chatPreviewContent = {
     },
   ],
 };
+
+/**
+ * @typedef {Object} FeatureItem
+ * @property {string} id
+ * @property {"zap"|"lock"|"users"|"history"} icon - resolved to a lucide-react
+ *   component inside FeatureCard; a string here (not the component itself)
+ *   because this data module gets imported by a server component and a raw
+ *   component reference can't cross the server/client boundary as a prop
+ * @property {string} title
+ * @property {string} description
+ * @property {string} [metadata] - short supporting stat/label shown under the description
+ */
+
+/**
+ * @typedef {Object} FeatureSectionContent
+ * @property {string} eyebrow
+ * @property {string} title
+ * @property {string} description
+ * @property {FeatureItem[]} features
+ */
+
+/** @type {FeatureSectionContent} */
+export const featureSectionContent = {
+  eyebrow: "Key features",
+  title: "Everything a real conversation needs.",
+  description: "Built around the parts of messaging that actually matter — speed, privacy, and never losing a thread.",
+  features: [
+    {
+      id: "realtime",
+      icon: "zap",
+      title: "Real-time messaging",
+      description:
+        "Messages arrive the instant they're sent, no refreshing, no delay. Every conversation stays live through a persistent connection, not a polling loop.",
+      metadata: "Instant delivery",
+    },
+    {
+      id: "private",
+      icon: "lock",
+      title: "Private conversations",
+      description:
+        "Start a one-to-one chat with anyone in seconds. Every conversation is scoped to just the two people in it, nothing more, nothing shared.",
+      metadata: "Just between you two",
+    },
+    {
+      id: "group",
+      icon: "users",
+      title: "Group conversations",
+      description:
+        "Bring your whole team into one thread. Admins manage who joins, who leaves, and who else gets to run the group.",
+      metadata: "Built-in admin controls",
+    },
+    {
+      id: "history",
+      icon: "history",
+      title: "Conversation history",
+      description:
+        "Nothing disappears. Scroll back as far as you need, older messages load in seamlessly right where you left off.",
+      metadata: "Loads as you scroll",
+    },
+  ],
+};
