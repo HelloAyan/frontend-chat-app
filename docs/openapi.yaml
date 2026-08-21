@@ -1,0 +1,714 @@
+openapi: 3.0.3
+info:
+  title: Chat API
+  version: 1.0.0
+  license:
+    name: Proprietary
+  description: |
+    Docs for the chat backend used in this take-home
+    (`https://frontend-task-chatapp.onrender.com`). The Swagger doc the
+    server ships doesn't include response bodies or status codes, so
+    everything below (schemas, status codes, the quirks list) was worked
+    out by actually hitting the endpoints, not guessed from the request
+    shapes alone.
+
+    ### Auth
+    `POST /auth/login` with a phone number and a name. There's no separate
+    signup step, a new phone number just gets registered on the spot and
+    an existing one logs in. You get a JWT back, send it as
+    `Authorization: Bearer <token>` on everything else, and pass the same
+    token in the Socket.IO handshake `auth` field for the websocket.
+
+    ### Real-time (Socket.IO)
+    Can't really express this in OpenAPI, so it's just written out here.
+    Connect to the host root, not `/api`:
+    ```js
+    const socket = io('https://frontend-task-chatapp.onrender.com', {
+      auth: { token },
+    });
+    ```
+    - `message:send` (client → server): `{ conversationId, text }`
+    - `message:new` (server → client): a new message for a conversation you're in
+    - `conversation:updated` (server → client): a group you're in was created, renamed, or had its members/admins changed
+
+    `POST /messages` also fires `message:new` on the socket, so in practice
+    there's one real send path worth using (REST, since it gives an
+    immediate response and real errors) and the socket is just for
+    receiving.
+
+    ### Groups
+    A conversation is either `direct` (two people) or `group` (three or
+    more, with a name and at least one admin, the creator starts as one).
+    Only admins can add/remove members, promote someone else, or rename;
+    anyone can remove themselves to leave. Groups send messages through
+    the same endpoint and event as direct chats.
+
+    ### Quirks in the live API
+    A few things the frontend has to account for:
+    - `/health` lives at the host root, not under `/api` like everything else.
+    - `POST /messages` with `text: ""` is accepted and saved (200), the
+      server doesn't reject it. Has to be blocked client-side.
+    - `POST /messages` to a conversation id that doesn't exist comes back
+      `200` with a `null` body instead of an error. `GET .../messages`
+      handles the same missing-conversation case correctly with a 404, so
+      the two endpoints don't agree with each other here.
+    - A missing token gets you `400` (`NO_TOKEN`), an invalid or expired
+      one gets `401` (`INVALID_TOKEN`). Same underlying problem, two
+      different codes depending on which way it fails.
+    - `POST /conversations` and `POST /conversations/group` hand back a
+      smaller object (just ids, no `type` or `lastMessage`) than what
+      `GET /conversations` returns for the same conversation. Both shapes
+      are documented below as they actually appear, the frontend just
+      normalizes them into one shape once it gets them.
+
+    Given the choice I'd probably put groups under their own `/groups`
+    resource instead of nesting everything under `/conversations`, and have
+    the create endpoints return the same shape the list endpoint does. Not
+    something worth changing on a backend I don't control, just noting it
+    since the brief says renaming things is fair game.
+
+servers:
+  - url: https://frontend-task-chatapp.onrender.com/api
+    description: Live deployment (everything below is relative to this base, except /health, see note above)
+
+tags:
+  - name: Auth
+    description: Login / register and current session
+  - name: Users
+    description: Find other users to start a conversation with
+  - name: Conversations
+    description: Direct conversations and message history
+  - name: Groups
+    description: Group creation and member / admin management
+  - name: Messages
+    description: Sending messages
+  - name: System
+    description: Service health
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      operationId: login
+      tags: [Auth]
+      summary: Log in or register
+      description: |
+        One step for both login and registration. If the phone number is
+        new, an account is created; if it already exists, the existing
+        account logs in (the `name` sent is not used to update an existing
+        user's stored name).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated successfully (new or existing user)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Missing/invalid phone or name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [Auth]
+      summary: Current user
+      description: Returns the user associated with the bearer token. Used to restore a session on page load.
+      responses:
+        '200':
+          description: The authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/MissingToken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/search:
+    get:
+      operationId: searchUsers
+      tags: [Users]
+      summary: Search users by name or phone
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search term, matched against a user's name or phone number.
+          schema:
+            type: string
+          example: Ada
+      responses:
+        '200':
+          description: Matching users (empty array if none match)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/MissingToken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /conversations:
+    get:
+      operationId: listConversations
+      tags: [Conversations]
+      summary: List my conversations
+      description: All conversations (direct and group) the current user participates in, most recently updated first.
+      responses:
+        '200':
+          description: The user's conversations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Conversation'
+        '400':
+          $ref: '#/components/responses/MissingToken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: startConversation
+      tags: [Conversations]
+      summary: Start a direct conversation
+      description: Starts a new 1-to-1 conversation, or returns the existing one if it already exists between these two users.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartConversationRequest'
+      responses:
+        '200':
+          description: The (new or existing) direct conversation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationCreateResult'
+        '400':
+          description: Missing/invalid userId, or no bearer token was sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /conversations/{id}/messages:
+    get:
+      operationId: getMessages
+      tags: [Conversations]
+      summary: Get message history
+      description: Cursor-paginated message history for a conversation, newest messages first.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The conversation id.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of messages to return per page.
+          schema:
+            type: integer
+          example: 20
+        - name: before
+          in: query
+          required: false
+          description: Cursor (a message id). Returns messages older than this one, for loading history.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A page of messages, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Message'
+                  hasMore:
+                    type: boolean
+                    description: Whether an older page exists (pass the last message's id as `before` to fetch it).
+        '400':
+          $ref: '#/components/responses/MissingToken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /messages:
+    post:
+      operationId: sendMessage
+      tags: [Messages]
+      summary: Send a message
+      description: |
+        Sends a message to a direct or group conversation. Delivered to all
+        participants over the WebSocket as `message:new`. Note: the server
+        currently accepts empty `text` (HTTP 200) and returns a `null` body
+        for an unknown `conversationId` (HTTP 200) rather than an error,
+        see the quirks note above.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessageRequest'
+      responses:
+        '200':
+          description: The created message, or `null` if the conversationId does not exist
+          content:
+            application/json:
+              schema:
+                type: object
+                allOf:
+                  - $ref: '#/components/schemas/Message'
+                nullable: true
+        '400':
+          description: Missing conversationId or text field, or no bearer token was sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /conversations/group:
+    post:
+      operationId: createGroup
+      tags: [Groups]
+      summary: Create a group
+      description: Creates a group conversation. The creator becomes the first admin and is implicitly a participant.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGroupRequest'
+      responses:
+        '200':
+          description: The created group conversation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '400':
+          $ref: '#/components/responses/MissingToken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /conversations/{id}/participants:
+    post:
+      operationId: addParticipants
+      tags: [Groups]
+      summary: Add members to a group
+      description: Admins only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The group id.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddParticipantsRequest'
+      responses:
+        '200':
+          description: The updated group conversation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '400':
+          $ref: '#/components/responses/MissingToken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Caller is not an admin of this group
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /conversations/{id}/participants/{userId}:
+    delete:
+      operationId: removeParticipant
+      tags: [Groups]
+      summary: Remove a member / leave a group
+      description: Admins can remove any member; any member can pass their own id to leave.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The group id.
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          description: The member to remove (pass your own id to leave).
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The updated group conversation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '400':
+          $ref: '#/components/responses/MissingToken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Caller is neither an admin nor removing themselves
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /conversations/{id}/admins:
+    post:
+      operationId: promoteAdmin
+      tags: [Groups]
+      summary: Promote a member to admin
+      description: Admins only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The group id.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PromoteRequest'
+      responses:
+        '200':
+          description: The updated group conversation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '400':
+          $ref: '#/components/responses/MissingToken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Caller is not an admin of this group
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /conversations/{id}:
+    patch:
+      operationId: renameGroup
+      tags: [Groups]
+      summary: Rename a group
+      description: Admins only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The group id.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenameGroupRequest'
+      responses:
+        '200':
+          description: The updated group conversation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '400':
+          $ref: '#/components/responses/MissingToken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Caller is not an admin of this group
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /health:
+    get:
+      operationId: healthCheck
+      tags: [System]
+      summary: Health check
+      description: Lives at the host root, not under the `/api` base like everything else.
+      security: []
+      servers:
+        - url: https://frontend-task-chatapp.onrender.com
+          description: Host root (no /api prefix)
+      responses:
+        '200':
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    MissingToken:
+      description: No bearer token was sent (this comes back as 400, not the more usual 401, see the quirks note above)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: { message: "No token provided", code: "NO_TOKEN" }
+    Unauthorized:
+      description: The bearer token is invalid or expired
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: { message: "Invalid token", code: "INVALID_TOKEN" }
+    NotFound:
+      description: The referenced resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: { message: "Conversation not found", code: "NOT_FOUND" }
+
+  schemas:
+    LoginRequest:
+      type: object
+      required: [phone, name]
+      properties:
+        phone:
+          type: string
+          example: "+15551234567"
+        name:
+          type: string
+          example: Ada Lovelace
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: "JWT. Send as `Authorization: Bearer <token>` on everything after this."
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 665f0c2a9b1e4a0012ab34cd
+        name:
+          type: string
+          example: Ada Lovelace
+        phone:
+          type: string
+          example: "+15551234567"
+        createdAt:
+          type: string
+          format: date-time
+
+    StartConversationRequest:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: string
+          description: The id of the user to converse with (from `/users/search`).
+          example: 665f0c2a9b1e4a0012ab34cd
+
+    ConversationCreateResult:
+      type: object
+      description: |
+        Shape returned by `POST /conversations` and `POST /conversations/group`,
+        narrower than the `Conversation` shape returned by `GET /conversations`
+        (see quirks note in the top-level description).
+      properties:
+        _id:
+          type: string
+        participants:
+          type: array
+          items:
+            type: string
+          description: Participant user ids.
+        createdAt:
+          type: string
+          format: date-time
+
+    Conversation:
+      type: object
+      description: Shape returned by `GET /conversations` and group management endpoints.
+      properties:
+        _id:
+          type: string
+        type:
+          type: string
+          enum: [direct, group]
+        updatedAt:
+          type: string
+          format: date-time
+        lastMessage:
+          description: The most recent message, or `{}` if none has been sent yet (all fields below are therefore optional).
+          allOf:
+            - $ref: '#/components/schemas/MessagePreview'
+        participant:
+          description: Only on direct conversations, the other person in the chat.
+          allOf:
+            - $ref: '#/components/schemas/User'
+        name:
+          type: string
+          description: Group name, only present on groups.
+        createdBy:
+          type: string
+          description: Only on groups, the creator's user id.
+        admins:
+          type: array
+          items:
+            type: string
+          description: Only on groups, admin user ids.
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+          description: Only on groups, the full member list.
+
+    MessagePreview:
+      type: object
+      properties:
+        text:
+          type: string
+        sender:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    Message:
+      type: object
+      properties:
+        _id:
+          type: string
+        conversation:
+          type: string
+        sender:
+          type: string
+          description: User id of the sender.
+        text:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    SendMessageRequest:
+      type: object
+      required: [conversationId, text]
+      properties:
+        conversationId:
+          type: string
+        text:
+          type: string
+          example: Hello!
+
+    CreateGroupRequest:
+      type: object
+      required: [name, participantIds]
+      properties:
+        name:
+          type: string
+          example: Project Team
+        participantIds:
+          type: array
+          description: Ids of the members to add (besides the creator).
+          items:
+            type: string
+
+    AddParticipantsRequest:
+      type: object
+      required: [userIds]
+      properties:
+        userIds:
+          type: array
+          items:
+            type: string
+
+    PromoteRequest:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: string
+
+    RenameGroupRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: Renamed Team
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+              example: No token provided
+            code:
+              type: string
+              example: NO_TOKEN
