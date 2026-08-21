@@ -72,6 +72,12 @@ info:
       Confirmed by sending a message over REST and listening for the socket
       event on the other side. Worth normalizing on receipt if the rest of
       the app treats REST-fetched and socket-delivered messages the same way.
+    - `conversation:updated` gets the id field right (`_id`, unlike
+      `message:new`) but is missing `lastMessage` and `updatedAt`, unlike
+      every REST response for the same conversation. Also worth knowing:
+      it's sent to a removed member too, with a `participants` array that no
+      longer includes them, that's the only signal a client gets that it
+      needs to drop the conversation from its own view.
 
     Given the choice I'd probably put groups under their own `/groups`
     resource instead of nesting everything under `/conversations`, and have

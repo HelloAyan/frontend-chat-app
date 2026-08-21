@@ -9,7 +9,7 @@ import { ChatPanel } from "@/components/chat/ChatPanel";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { useGetConversationsQuery, useStartConversationMutation, conversationsApi } from "@/features/conversations/api";
 import { useGetMessagesInfiniteQuery, useSendMessageMutation } from "@/features/messages/api";
-import { useMessageSocket } from "@/features/messages/hooks";
+import { useChatSocket } from "@/features/messages/hooks";
 import {
   useCreateGroupMutation,
   useAddParticipantsMutation,
@@ -274,7 +274,42 @@ export default function ChatPage() {
     appendMessage(conversationId, message);
   }
 
-  useMessageSocket(currentUser ? getTokenCookie() : null, handleIncomingMessage);
+  // fires for anyone in a group that gets created, renamed, or has its
+  // members/admins change — including the person being removed, whose
+  // payload comes back without their own id in `participants`
+  function handleConversationUpdate(updatedConversation) {
+    const conversationId = updatedConversation._id;
+    const isStillAMember = updatedConversation.participants.some((p) => p._id === currentUser?._id);
+
+    if (!isStillAMember) {
+      removeConversationFromView(conversationId);
+      if (activeId === conversationId) setActiveId(null);
+      return;
+    }
+
+    const isKnownConversation = conversations.some((c) => c._id === conversationId);
+    if (!isKnownConversation) {
+      // e.g. just got added to a new group — the socket payload doesn't
+      // carry lastMessage/updatedAt anyway, simpler to just refetch
+      dispatch(conversationsApi.util.invalidateTags(["Conversation"]));
+      return;
+    }
+
+    // unlike every REST response for the same conversation, this payload
+    // has no lastMessage/updatedAt, patch only touches fields that are
+    // actually present instead of overwriting good data with gaps
+    patchConversation(conversationId, {
+      type: updatedConversation.type,
+      name: updatedConversation.name,
+      admins: updatedConversation.admins,
+      participants: updatedConversation.participants,
+    });
+  }
+
+  useChatSocket(currentUser ? getTokenCookie() : null, {
+    onMessage: handleIncomingMessage,
+    onConversationUpdate: handleConversationUpdate,
+  });
 
   async function handleSendMessage(text) {
     if (!activeConversation || !currentUser) return;
