@@ -1,17 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { useCurrentUser } from "@/features/auth/hooks";
-import { useGetConversationsQuery } from "@/features/conversations/api";
+import { useGetConversationsQuery, useStartConversationMutation } from "@/features/conversations/api";
 import { MOCK_USERS } from "@/lib/mockChatData";
 import { cn } from "@/lib/cn";
 
-// Starting a conversation, creating a group, and sending a message are
-// still mock/local (their own API steps haven't landed yet), so anything
-// created that way lives in localConversations until it does. It's merged
-// with the real fetched list below rather than replacing it.
+// Creating a group and sending a message are still mock/local (their own
+// API steps haven't landed yet), so anything created that way lives in
+// localConversations until it does. It's merged with the real fetched list
+// below rather than replacing it. Starting a direct conversation is real
+// now: it seeds an optimistic entry under the server's own id, so once the
+// invalidated refetch brings back the full conversation the merge below
+// swaps it in automatically instead of leaving a duplicate.
 export default function ChatPage() {
   const { data: currentUser } = useCurrentUser();
   const {
@@ -20,6 +24,7 @@ export default function ChatPage() {
     isError: isConversationsError,
     refetch: refetchConversations,
   } = useGetConversationsQuery();
+  const [startConversation] = useStartConversationMutation();
 
   const [localConversations, setLocalConversations] = useState([]);
   const [messagesByConversation, setMessagesByConversation] = useState({});
@@ -44,23 +49,31 @@ export default function ChatPage() {
     return raw.map((message) => ({ ...message, senderName: nameById.get(message.sender) }));
   }, [activeConversation, messagesByConversation]);
 
-  function handleStartConversation(user) {
+  async function handleStartConversation(user) {
     const existing = conversations.find((c) => c.type === "direct" && c.participant._id === user._id);
     if (existing) {
       setActiveId(existing._id);
       return;
     }
 
-    const newConversation = {
-      _id: `local-${user._id}`,
-      type: "direct",
-      participant: user,
-      lastMessage: null,
-      updatedAt: new Date().toISOString(),
-    };
-    setLocalConversations((prev) => [newConversation, ...prev]);
-    setMessagesByConversation((prev) => ({ ...prev, [newConversation._id]: [] }));
-    setActiveId(newConversation._id);
+    try {
+      const result = await startConversation(user._id).unwrap();
+      // POST /conversations only returns { _id, participants, createdAt },
+      // not the full shape GET /conversations gives back, so this fills in
+      // the rest from the user we already have on hand (search result)
+      const optimisticConversation = {
+        _id: result._id,
+        type: "direct",
+        participant: user,
+        lastMessage: null,
+        updatedAt: result.createdAt,
+      };
+      setLocalConversations((prev) => [optimisticConversation, ...prev]);
+      setMessagesByConversation((prev) => ({ ...prev, [result._id]: [] }));
+      setActiveId(result._id);
+    } catch (err) {
+      toast.error(err.message || "Couldn't start the conversation, please try again.");
+    }
   }
 
   function handleCreateGroup({ name, participantIds }) {
