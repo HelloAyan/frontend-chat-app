@@ -3,6 +3,50 @@
 // component code. Every landing section reads its content from an object
 // exported from this file.
 
+/**
+ * @typedef {Object} NavLink
+ * @property {string} label
+ * @property {string} href
+ */
+
+/**
+ * @typedef {Object} NavbarContent
+ * @property {{label: string, href: string}} brand
+ * @property {NavLink[]} navLinks
+ * @property {{label: string, href: string}} cta
+ */
+
+/** @type {NavbarContent} */
+export const navbarContent = {
+  brand: { label: "Threadly", href: "/" },
+  navLinks: [
+    { label: "Features", href: "#features" },
+    { label: "Chat preview", href: "#chat-preview" },
+  ],
+  cta: { label: "Start Chatting", href: "/login" },
+};
+
+/**
+ * @typedef {Object} FooterContent
+ * @property {{label: string, href: string}} brand
+ * @property {string} description
+ * @property {NavLink[]} navLinks
+ * @property {string} copyright - trailing legal text, combined with the brand name and the current year at render time
+ */
+
+/** @type {FooterContent} */
+export const footerContent = {
+  brand: { label: "Threadly", href: "/" },
+  description:
+    "Fast, reliable real-time messaging for people and teams — one-to-one and group conversations that stay in sync.",
+  navLinks: [
+    { label: "Features", href: "#features" },
+    { label: "Chat preview", href: "#chat-preview" },
+    { label: "Log in", href: "/login" },
+  ],
+  copyright: "All rights reserved.",
+};
+
 export const heroContent = {
   eyebrow: "Real-time messaging",
   title: "Conversations that move in real time.",

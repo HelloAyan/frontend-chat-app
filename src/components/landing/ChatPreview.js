@@ -16,7 +16,7 @@ export function ChatPreview({ eyebrow, title, description, conversations }) {
   const active = conversations.find((conversation) => conversation.isActive) ?? conversations[0];
 
   return (
-    <section id="features" className="px-6 py-20 sm:py-28 lg:px-8">
+    <section id="chat-preview" className="px-6 py-20 sm:py-28 lg:px-8">
       <div className="mx-auto max-w-6xl">
         <div className="mx-auto max-w-2xl text-center">
           {eyebrow && (

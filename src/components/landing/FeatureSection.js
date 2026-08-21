@@ -20,7 +20,7 @@ export function FeatureSection({ eyebrow, title, description, features }) {
   }, []);
 
   return (
-    <section className="px-6 py-20 sm:py-28 lg:px-8">
+    <section id="features" className="px-6 py-20 sm:py-28 lg:px-8">
       <div className="mx-auto max-w-6xl">
         <div className="mx-auto max-w-2xl text-center">
           {eyebrow && (
