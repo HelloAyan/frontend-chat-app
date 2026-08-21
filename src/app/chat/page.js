@@ -10,7 +10,7 @@ import { useCurrentUser } from "@/features/auth/hooks";
 import { useGetConversationsQuery, useStartConversationMutation, conversationsApi } from "@/features/conversations/api";
 import { useGetMessagesInfiniteQuery, useSendMessageMutation } from "@/features/messages/api";
 import { useMessageSocket } from "@/features/messages/hooks";
-import { useCreateGroupMutation } from "@/features/groups/api";
+import { useCreateGroupMutation, useAddParticipantsMutation } from "@/features/groups/api";
 import { getTokenCookie } from "@/lib/cookies";
 import { cn } from "@/lib/cn";
 
@@ -29,6 +29,7 @@ export default function ChatPage() {
   } = useGetConversationsQuery();
   const [startConversation] = useStartConversationMutation();
   const [createGroup, { isLoading: isCreatingGroup }] = useCreateGroupMutation();
+  const [addParticipants, { isLoading: isAddingMembers }] = useAddParticipantsMutation();
   const [sendMessage] = useSendMessageMutation();
   const dispatch = useDispatch();
 
@@ -125,27 +126,48 @@ export default function ChatPage() {
     }
   }
 
-  // updates wherever this conversation's preview line lives: the RTK Query
-  // cache if it came from GET /conversations, the local overlay if it's
-  // still only known client-side (e.g. a just-started chat before its
-  // refetch lands). harmless to do both, the merge above always prefers
-  // whichever one is real.
-  function updateConversationPreview(conversationId, message) {
-    const preview = { text: message.text, sender: message.sender, createdAt: message.createdAt };
+  // applies `patch` wherever this conversation currently lives: the RTK
+  // Query cache if it came from GET /conversations, the local overlay if
+  // it's still only known client-side (e.g. just created, refetch not
+  // landed yet). harmless to do both, the merge above always prefers
+  // whichever one is real. `patch` is a plain object or an updater function
+  // (conversation) => partial object, for patches that depend on the
+  // current value (e.g. appending to a list).
+  function patchConversation(conversationId, patch) {
+    function resolve(conversation) {
+      return typeof patch === "function" ? patch(conversation) : patch;
+    }
 
     dispatch(
       conversationsApi.util.updateQueryData("getConversations", undefined, (draft) => {
         const conversation = draft.find((c) => c._id === conversationId);
-        if (conversation) {
-          conversation.lastMessage = preview;
-          conversation.updatedAt = message.createdAt;
-        }
+        if (conversation) Object.assign(conversation, resolve(conversation));
       }),
     );
 
     setLocalConversations((prev) =>
-      prev.map((c) => (c._id === conversationId ? { ...c, lastMessage: preview, updatedAt: message.createdAt } : c)),
+      prev.map((c) => (c._id === conversationId ? { ...c, ...resolve(c) } : c)),
     );
+  }
+
+  function updateConversationPreview(conversationId, message) {
+    patchConversation(conversationId, {
+      lastMessage: { text: message.text, sender: message.sender, createdAt: message.createdAt },
+      updatedAt: message.createdAt,
+    });
+  }
+
+  async function handleAddMembers(userIds) {
+    if (!activeConversation) return false;
+
+    try {
+      const updated = await addParticipants({ conversationId: activeConversation._id, userIds }).unwrap();
+      patchConversation(activeConversation._id, { participants: updated.participants, admins: updated.admins });
+      return true;
+    } catch (err) {
+      toast.error(err.message || "Couldn't add members, please try again.");
+      return false;
+    }
   }
 
   // idempotent by message id: a message this tab just sent over REST also
@@ -224,6 +246,8 @@ export default function ChatPage() {
         onLoadOlderMessages={loadOlderMessages}
         onBack={() => setActiveId(null)}
         onSendMessage={handleSendMessage}
+        onAddMembers={handleAddMembers}
+        isAddingMembers={isAddingMembers}
         className={cn(!activeId && "hidden md:flex")}
       />
     </>
