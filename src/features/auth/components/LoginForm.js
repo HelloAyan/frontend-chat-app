@@ -1,21 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { useLogin } from "../hooks";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { PhoneInput } from "@/components/ui/PhoneInput";
 
-// react-phone-input-2 gives back the raw digits with the dial code baked in
-// (e.g. "8801711000999"), not the national number on its own, so the dial
-// code has to be stripped off before checking there's an actual number left
-function validate({ phone, dialCode, name }) {
+function validate({ phone, name }) {
   const errors = {};
-  const nationalNumber = dialCode ? phone.slice(dialCode.length) : phone;
 
-  if (!nationalNumber || nationalNumber.length < 6) {
+  if (!phone || phone.length < 6) {
     errors.phone = "Enter a valid phone number";
   }
 
@@ -29,30 +23,39 @@ function validate({ phone, dialCode, name }) {
 }
 
 export function LoginForm() {
-  const router = useRouter();
   const { login, isPending } = useLogin();
 
   const [phone, setPhone] = useState("");
-  const [dialCode, setDialCode] = useState("");
   const [name, setName] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
 
-  function handlePhoneChange(value, country) {
-    setPhone(value);
-    setDialCode(country.dialCode);
+  // digits only, no "+", no country picker. the API stores phone numbers
+  // verbatim and search matches phone exactly (not a substring), so keeping
+  // this dead simple means the same digits typed here are the same digits
+  // that'll find this account again later
+  function handlePhoneChange(event) {
+    setPhone(event.target.value.replace(/\D/g, ""));
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
 
-    const errors = validate({ phone, dialCode, name });
+    const errors = validate({ phone, name });
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
     try {
-      const result = await login({ phone: `+${phone}`, name: name.trim() });
+      const result = await login({ phone, name: name.trim() });
       toast.success(`Welcome, ${result.user.name.split(" ")[0]}`);
-      router.push("/chat");
+      // a hard navigation here instead of router.push avoids a race right
+      // after login: a client-side transition keeps the same React tree
+      // (and RTK Query cache) alive, so the session-guard effect on /chat
+      // re-evaluates while that cache is still catching up to the cookie
+      // that was just set, and can bounce straight back to /login. a full
+      // reload means proxy.js and every hook re-run fresh, cookie already
+      // in place.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.href = "/chat";
     } catch (err) {
       toast.error(err.message || "Couldn't log you in, please try again.");
     }
@@ -71,12 +74,16 @@ export function LoginForm() {
       </div>
 
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-        <PhoneInput
+        <Input
+          id="phone"
+          type="tel"
+          inputMode="numeric"
           label="Phone number"
-          country="bd"
+          placeholder="01712345678"
           value={phone}
           onChange={handlePhoneChange}
           error={fieldErrors.phone}
+          autoComplete="tel"
         />
         <Input
           id="name"
