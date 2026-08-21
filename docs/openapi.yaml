@@ -60,6 +60,12 @@ info:
       `GET /conversations` returns for the same conversation. Both shapes
       are documented below as they actually appear, the frontend just
       normalizes them into one shape once it gets them.
+    - the `before` cursor on `GET .../messages` is inclusive, not exclusive.
+      Paginating with `before` set to the oldest message id from the
+      previous page returns that same message again as the newest item of
+      the next page, instead of starting strictly after it. Harmless if the
+      caller dedupes by `_id` when stitching pages together, which is worth
+      doing regardless since it's an easy thing to miss.
 
     Given the choice I'd probably put groups under their own `/groups`
     resource instead of nesting everything under `/conversations`, and have

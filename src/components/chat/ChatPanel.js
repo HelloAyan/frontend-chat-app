@@ -4,7 +4,20 @@ import { MessageComposer } from "./MessageComposer";
 import { ChatEmptyState } from "./ChatEmptyState";
 import { cn } from "@/lib/cn";
 
-export function ChatPanel({ conversation, messages, currentUserId, isLoadingMessages, onBack, onSendMessage, className }) {
+export function ChatPanel({
+  conversation,
+  messages,
+  currentUserId,
+  isLoadingMessages,
+  isMessagesError,
+  onRetryMessages,
+  hasMoreOlderMessages,
+  isLoadingOlderMessages,
+  onLoadOlderMessages,
+  onBack,
+  onSendMessage,
+  className,
+}) {
   if (!conversation) {
     return <ChatEmptyState className={className} />;
   }
@@ -17,6 +30,11 @@ export function ChatPanel({ conversation, messages, currentUserId, isLoadingMess
         currentUserId={currentUserId}
         isGroup={conversation.type === "group"}
         isLoading={isLoadingMessages}
+        isError={isMessagesError}
+        onRetry={onRetryMessages}
+        hasMoreOlder={hasMoreOlderMessages}
+        isLoadingOlder={isLoadingOlderMessages}
+        onLoadOlder={onLoadOlderMessages}
       />
       <MessageComposer onSend={onSendMessage} />
     </div>

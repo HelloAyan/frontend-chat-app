@@ -2,20 +2,21 @@
 
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import { skipToken } from "@reduxjs/toolkit/query/react";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { useGetConversationsQuery, useStartConversationMutation } from "@/features/conversations/api";
+import { useGetMessagesInfiniteQuery } from "@/features/messages/api";
 import { MOCK_USERS } from "@/lib/mockChatData";
 import { cn } from "@/lib/cn";
 
 // Creating a group and sending a message are still mock/local (their own
 // API steps haven't landed yet), so anything created that way lives in
-// localConversations until it does. It's merged with the real fetched list
-// below rather than replacing it. Starting a direct conversation is real
-// now: it seeds an optimistic entry under the server's own id, so once the
-// invalidated refetch brings back the full conversation the merge below
-// swaps it in automatically instead of leaving a duplicate.
+// localConversations/messagesByConversation until it does. Both get merged
+// with real fetched data below rather than replacing it. A "local-group-"
+// id is the only kind of conversation that's still entirely mock; anything
+// else (fetched, or started for real in step 3) fetches its real history.
 export default function ChatPage() {
   const { data: currentUser } = useCurrentUser();
   const {
@@ -37,17 +38,41 @@ export default function ChatPage() {
   }, [fetchedConversations, localConversations]);
 
   const activeConversation = conversations.find((c) => c._id === activeId) ?? null;
+  const isMockOnlyConversation = activeConversation?._id.startsWith("local-group-") ?? true;
+
+  const {
+    data: messagesPages,
+    isLoading: isLoadingMessages,
+    isFetchingNextPage: isLoadingOlderMessages,
+    isError: isMessagesError,
+    hasNextPage: hasMoreOlderMessages,
+    fetchNextPage: loadOlderMessages,
+    refetch: refetchMessages,
+  } = useGetMessagesInfiniteQuery(isMockOnlyConversation ? skipToken : activeConversation._id);
 
   const activeMessages = useMemo(() => {
     if (!activeConversation) return [];
-    const raw = messagesByConversation[activeConversation._id] ?? [];
+
+    const localOnly = messagesByConversation[activeConversation._id] ?? [];
+    // pages arrive newest-page-first, and each page is newest-message-first
+    // internally, reversing the whole flattened run puts everything in one
+    // consistent oldest-to-newest order for rendering top to bottom. the
+    // API's `before` cursor is inclusive rather than exclusive, so the
+    // oldest message of one page shows up again as the newest message of
+    // the next, the Map dedupes that (keeping the first position it saw,
+    // which is what reverse() needs to end up in the right spot)
+    const fetched = messagesPages
+      ? Array.from(new Map(messagesPages.pages.flatMap((page) => page.messages).map((m) => [m._id, m])).values()).reverse()
+      : [];
+    const raw = isMockOnlyConversation ? localOnly : [...fetched, ...localOnly];
+
     if (activeConversation.type !== "group") return raw;
 
     // the server only ever gives back a sender id, group bubbles need a name
     // to show above other people's messages
     const nameById = new Map(activeConversation.participants.map((p) => [p._id, p.name]));
     return raw.map((message) => ({ ...message, senderName: nameById.get(message.sender) }));
-  }, [activeConversation, messagesByConversation]);
+  }, [activeConversation, isMockOnlyConversation, messagesPages, messagesByConversation]);
 
   async function handleStartConversation(user) {
     const existing = conversations.find((c) => c.type === "direct" && c.participant._id === user._id);
@@ -137,7 +162,12 @@ export default function ChatPage() {
         conversation={activeConversation}
         messages={activeMessages}
         currentUserId={currentUser?._id}
-        isLoadingMessages={false}
+        isLoadingMessages={!isMockOnlyConversation && isLoadingMessages}
+        isMessagesError={!isMockOnlyConversation && isMessagesError}
+        onRetryMessages={refetchMessages}
+        hasMoreOlderMessages={!isMockOnlyConversation && hasMoreOlderMessages}
+        isLoadingOlderMessages={isLoadingOlderMessages}
+        onLoadOlderMessages={loadOlderMessages}
         onBack={() => setActiveId(null)}
         onSendMessage={handleSendMessage}
         className={cn(!activeId && "hidden md:flex")}
