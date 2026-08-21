@@ -84,6 +84,7 @@
      inline keyframes */
   --animate-fade-in-up: fade-in-up 0.6s ease-out both;
   --animate-float: float 3.5s ease-in-out infinite;
+  --animate-badge-pop: badge-pop 2.4s ease-in-out both;
 }
 
 @keyframes fade-in-up {
@@ -107,8 +108,40 @@
   }
 }
 
+/* pops in, holds, then fades out on its own — used for the "new message"
+   indicator in the real-time showcase, no JS timer needed to dismiss it */
+@keyframes badge-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 4px) scale(0.9);
+  }
+  15%,
+  80% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
 @layer base {
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* landing-page animations are decorative, not functional — respect the
+   OS-level motion preference for all of them at once instead of trusting
+   every component to check it individually */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

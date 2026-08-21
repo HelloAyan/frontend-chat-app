@@ -11,7 +11,7 @@ export const heroContent = {
   primaryCta: { label: "Start Chatting", href: "/login" },
   secondaryCta: { label: "Explore Features", href: "#features" },
   image: {
-    src: "https://images.unsplash.com/photo-1611746872915-64382b5c76da?q=80&w=1200&auto=format&fit=crop",
+    src: "/images/hero.jpg",
     alt: "A phone screen open to a folder of messaging apps",
   },
   previewMessages: [
@@ -159,4 +159,40 @@ export const featureSectionContent = {
       metadata: "Loads as you scroll",
     },
   ],
+};
+
+/**
+ * @typedef {Object} ShowcaseMessage
+ * @property {string} id
+ * @property {"incoming"|"outgoing"} direction
+ * @property {string} text
+ * @property {string} time
+ */
+
+/**
+ * @typedef {Object} RealtimeShowcaseContent
+ * @property {string} eyebrow
+ * @property {string} title
+ * @property {string} description
+ * @property {{name: string, isOnline: boolean}} participant
+ * @property {ShowcaseMessage[]} baseMessages - visible immediately, before the animated sequence runs
+ * @property {ShowcaseMessage} incomingMessage - "arrives" after the typing indicator, once, on mount
+ */
+
+/** @type {RealtimeShowcaseContent} */
+export const realtimeShowcaseContent = {
+  eyebrow: "Real-time, not just refreshed",
+  title: "Watch a message arrive, live.",
+  description: "No refresh button, no polling delay — new messages land the instant they're sent, typing indicator and all.",
+  participant: { name: "Karim Hasan", isOnline: true },
+  baseMessages: [
+    { id: "s1", direction: "incoming", text: "Did you get a chance to review the PR?", time: "11:02 AM" },
+    { id: "s2", direction: "outgoing", text: "Just about to, give me two minutes.", time: "11:03 AM" },
+  ],
+  incomingMessage: {
+    id: "s3",
+    direction: "incoming",
+    text: "No rush, thanks for the quick turnaround 🙌",
+    time: "11:06 AM",
+  },
 };

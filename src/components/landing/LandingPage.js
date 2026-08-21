@@ -1,8 +1,14 @@
 import { Header } from "./Header";
 import { Hero } from "./Hero";
 import { ChatPreviewSection } from "./ChatPreviewSection";
+import { RealtimeShowcase } from "./RealtimeShowcase";
 import { FeatureSection } from "./FeatureSection";
-import { heroContent, chatPreviewContent, featureSectionContent } from "@/lib/landingContent";
+import {
+  heroContent,
+  chatPreviewContent,
+  realtimeShowcaseContent,
+  featureSectionContent,
+} from "@/lib/landingContent";
 
 // composition root for "/" — more sections (testimonials, footer, etc.) get
 // added here later, each its own component reading from lib/landingContent.js
@@ -13,6 +19,7 @@ export function LandingPage() {
       <Header />
       <Hero {...heroContent} />
       <ChatPreviewSection {...chatPreviewContent} />
+      <RealtimeShowcase {...realtimeShowcaseContent} />
       <FeatureSection {...featureSectionContent} />
     </main>
   );
