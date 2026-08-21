@@ -19,3 +19,83 @@ export const heroContent = {
     { from: "You", text: "On it, give me 5 minutes 👍", variant: "own" },
   ],
 };
+
+/**
+ * @typedef {Object} PreviewParticipant
+ * @property {string} name
+ * @property {boolean} isOnline
+ * @property {boolean} [isGroup]
+ */
+
+/**
+ * @typedef {Object} PreviewMessage
+ * @property {string} id
+ * @property {"incoming"|"outgoing"} direction - which side of the thread this bubble renders on
+ * @property {string} text
+ * @property {string} time - pre-formatted display time, e.g. "10:26 AM"
+ */
+
+/**
+ * @typedef {Object} PreviewConversation
+ * @property {string} id
+ * @property {PreviewParticipant} participant
+ * @property {string} lastMessage
+ * @property {string} lastMessageTime - relative, e.g. "2m", "1h"
+ * @property {boolean} isActive - which conversation the mock chat panel opens to
+ * @property {PreviewMessage[]} messages - only populated for the active conversation
+ */
+
+/**
+ * @typedef {Object} ChatPreviewContent
+ * @property {string} eyebrow
+ * @property {string} title
+ * @property {string} description
+ * @property {PreviewConversation[]} conversations
+ */
+
+/** @type {ChatPreviewContent} */
+export const chatPreviewContent = {
+  eyebrow: "See it in action",
+  title: "A chat panel built for real conversations.",
+  description:
+    "Every message, timestamp, and online status updates the moment it happens — this is the same panel you'll actually use.",
+  conversations: [
+    {
+      id: "c1",
+      participant: { name: "Nusrat Jahan", isOnline: true },
+      lastMessage: "Sounds good, see you at 4!",
+      lastMessageTime: "2m",
+      isActive: true,
+      messages: [
+        { id: "m1", direction: "incoming", text: "Hey! Are we still on for the design review?", time: "10:24 AM" },
+        { id: "m2", direction: "outgoing", text: "Yes, just wrapping up a few slides.", time: "10:26 AM" },
+        { id: "m3", direction: "incoming", text: "No rush, take your time 🙂", time: "10:26 AM" },
+        { id: "m4", direction: "outgoing", text: "Sounds good, see you at 4!", time: "10:29 AM" },
+      ],
+    },
+    {
+      id: "c2",
+      participant: { name: "Rahim Ahmed", isOnline: false },
+      lastMessage: "Pushed the fix, can you take a look?",
+      lastMessageTime: "18m",
+      isActive: false,
+      messages: [],
+    },
+    {
+      id: "c3",
+      participant: { name: "Product Team", isOnline: true, isGroup: true },
+      lastMessage: "Karim: Deploy is done ✅",
+      lastMessageTime: "1h",
+      isActive: false,
+      messages: [],
+    },
+    {
+      id: "c4",
+      participant: { name: "Tania Islam", isOnline: false },
+      lastMessage: "Thanks for the update!",
+      lastMessageTime: "3h",
+      isActive: false,
+      messages: [],
+    },
+  ],
+};
