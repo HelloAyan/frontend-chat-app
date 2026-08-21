@@ -14,7 +14,7 @@ export function ChatSidebar({
   isLoading,
   isError,
   onRetry,
-  users,
+  groupMemberOptions,
   onSelectConversation,
   onStartConversation,
   onCreateGroup,
@@ -25,7 +25,7 @@ export function ChatSidebar({
   return (
     <aside className={cn("flex h-full flex-col border-r border-border bg-card", className)}>
       <div className="border-b border-border p-3">
-        <ConversationSearch users={users} onStartConversation={onStartConversation} />
+        <ConversationSearch onStartConversation={onStartConversation} />
       </div>
 
       <div className="flex-1 overflow-y-auto py-2">
@@ -48,7 +48,7 @@ export function ChatSidebar({
 
       {isGroupDialogOpen && (
         <NewGroupDialog
-          users={users}
+          users={groupMemberOptions}
           onClose={() => setGroupDialogOpen(false)}
           onCreate={(payload) => {
             onCreateGroup(payload);

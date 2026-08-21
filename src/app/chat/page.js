@@ -114,7 +114,7 @@ export default function ChatPage() {
         isLoading={isLoadingConversations}
         isError={isConversationsError}
         onRetry={refetchConversations}
-        users={MOCK_USERS}
+        groupMemberOptions={MOCK_USERS}
         onSelectConversation={setActiveId}
         onStartConversation={handleStartConversation}
         onCreateGroup={handleCreateGroup}

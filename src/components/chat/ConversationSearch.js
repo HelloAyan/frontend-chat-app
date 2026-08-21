@@ -1,22 +1,34 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchUsersQuery } from "@/features/users/api";
 import { Avatar } from "@/components/shared/Avatar";
 
-// filters the given user list client-side for now; once the API layer is
-// wired in this becomes a debounced call to GET /users/search?q=
-export function ConversationSearch({ users, onStartConversation }) {
-  const [query, setQuery] = useState("");
+const DEBOUNCE_MS = 300;
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return users.filter((user) => user.name.toLowerCase().includes(q) || user.phone.includes(q));
-  }, [query, users]);
+export function ConversationSearch({ onStartConversation }) {
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const {
+    data: results = [],
+    isFetching,
+    isError,
+  } = useSearchUsersQuery(debouncedQuery, { skip: !debouncedQuery });
+
+  // the debounce timer hasn't caught up with what's actually typed yet, so
+  // `results` still reflects the previous (possibly empty) search term
+  const isSearching = isFetching || query.trim() !== debouncedQuery;
 
   function handleSelect(user) {
     onStartConversation(user);
     setQuery("");
+    setDebouncedQuery("");
   }
 
   return (
@@ -31,7 +43,11 @@ export function ConversationSearch({ users, onStartConversation }) {
 
       {query.trim() && (
         <div className="absolute inset-x-0 top-full z-10 mt-1.5 max-h-64 overflow-y-auto rounded-lg border border-border bg-card p-1.5 shadow-lg">
-          {results.length === 0 ? (
+          {isSearching ? (
+            <p className="px-2.5 py-2 text-xs text-muted-foreground">Searching...</p>
+          ) : isError ? (
+            <p className="px-2.5 py-2 text-xs text-destructive">Couldn&rsquo;t search right now</p>
+          ) : results.length === 0 ? (
             <p className="px-2.5 py-2 text-xs text-muted-foreground">No one found</p>
           ) : (
             results.map((user) => (
