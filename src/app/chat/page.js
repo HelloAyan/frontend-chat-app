@@ -15,6 +15,7 @@ import {
   useAddParticipantsMutation,
   useRemoveParticipantMutation,
   usePromoteAdminMutation,
+  useRenameGroupMutation,
 } from "@/features/groups/api";
 import { getTokenCookie } from "@/lib/cookies";
 import { cn } from "@/lib/cn";
@@ -37,6 +38,7 @@ export default function ChatPage() {
   const [addParticipants, { isLoading: isAddingMembers }] = useAddParticipantsMutation();
   const [removeParticipant] = useRemoveParticipantMutation();
   const [promoteAdmin] = usePromoteAdminMutation();
+  const [renameGroup] = useRenameGroupMutation();
   const [sendMessage] = useSendMessageMutation();
   const dispatch = useDispatch();
 
@@ -216,6 +218,19 @@ export default function ChatPage() {
     }
   }
 
+  async function handleRenameGroup(name) {
+    if (!activeConversation) return false;
+
+    try {
+      const updated = await renameGroup({ conversationId: activeConversation._id, name }).unwrap();
+      patchConversation(activeConversation._id, { name: updated.name });
+      return true;
+    } catch (err) {
+      toast.error(err.message || "Couldn't rename the group, please try again.");
+      return false;
+    }
+  }
+
   async function handleLeaveGroup() {
     if (!activeConversation || !currentUser) return;
     const conversationId = activeConversation._id;
@@ -310,6 +325,7 @@ export default function ChatPage() {
         isAddingMembers={isAddingMembers}
         onRemoveMember={handleRemoveMember}
         onPromoteAdmin={handlePromoteAdmin}
+        onRenameGroup={handleRenameGroup}
         onLeaveGroup={handleLeaveGroup}
         className={cn(!activeId && "hidden md:flex")}
       />

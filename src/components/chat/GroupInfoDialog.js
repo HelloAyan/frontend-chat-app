@@ -13,6 +13,7 @@ export function GroupInfoDialog({
   isAddingMembers,
   onRemoveMember,
   onPromoteAdmin,
+  onRenameGroup,
   onLeaveGroup,
 }) {
   const isAdmin = conversation.admins.includes(currentUserId);
@@ -23,6 +24,35 @@ export function GroupInfoDialog({
   const [removingId, setRemovingId] = useState(null);
   const [promotingId, setPromotingId] = useState(null);
   const [isLeaving, setIsLeaving] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(conversation.name);
+  const [isRenaming, setIsRenaming] = useState(false);
+
+  function startEditingName() {
+    setNameDraft(conversation.name);
+    setIsEditingName(true);
+  }
+
+  async function handleRename() {
+    const trimmed = nameDraft.trim();
+    if (!trimmed || trimmed === conversation.name) {
+      setIsEditingName(false);
+      return;
+    }
+    setIsRenaming(true);
+    const renamed = await onRenameGroup(trimmed);
+    setIsRenaming(false);
+    if (renamed) setIsEditingName(false);
+  }
+
+  function handleNameKeyDown(event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      handleRename();
+    } else if (event.key === "Escape") {
+      setIsEditingName(false);
+    }
+  }
 
   async function handleAdd() {
     if (selectedUsers.length === 0) return;
@@ -58,8 +88,56 @@ export function GroupInfoDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 px-4">
       <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-xl">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="truncate text-base font-semibold text-foreground">{conversation.name}</h2>
+          <div className="min-w-0 flex-1">
+            {isEditingName ? (
+              <div className="flex items-center gap-1">
+                <input
+                  autoFocus
+                  value={nameDraft}
+                  onChange={(event) => setNameDraft(event.target.value)}
+                  onKeyDown={handleNameKeyDown}
+                  disabled={isRenaming}
+                  className="min-w-0 flex-1 rounded-lg border border-input bg-background px-2.5 py-1 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                <button
+                  type="button"
+                  onClick={handleRename}
+                  disabled={isRenaming}
+                  aria-label="Save name"
+                  className="shrink-0 rounded-lg p-1 text-primary hover:bg-secondary disabled:opacity-50"
+                >
+                  {isRenaming ? (
+                    <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  ) : (
+                    <CheckIcon />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingName(false)}
+                  disabled={isRenaming}
+                  aria-label="Cancel rename"
+                  className="shrink-0 rounded-lg p-1 text-muted-foreground hover:bg-secondary disabled:opacity-50"
+                >
+                  <RemoveIcon />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1">
+                <h2 className="truncate text-base font-semibold text-foreground">{conversation.name}</h2>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={startEditingName}
+                    aria-label="Rename group"
+                    title="Rename"
+                    className="shrink-0 rounded-lg p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  >
+                    <EditIcon />
+                  </button>
+                )}
+              </div>
+            )}
             <p className="mt-0.5 text-xs text-muted-foreground">{conversation.participants.length} members</p>
           </div>
           <button
@@ -180,6 +258,22 @@ export function GroupInfoDialog({
         </div>
       </div>
     </div>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
+function EditIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+    </svg>
   );
 }
 

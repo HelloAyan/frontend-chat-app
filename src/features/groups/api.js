@@ -37,6 +37,16 @@ export const groupsApi = createApi({
         body: { userId },
       }),
     }),
+    // admin-only (403 otherwise). trying this on a direct conversation gets
+    // a 400 NOT_A_GROUP, though the UI only ever offers renaming for groups
+    // in the first place.
+    renameGroup: builder.mutation({
+      query: ({ conversationId, name }) => ({
+        url: `/conversations/${conversationId}`,
+        method: "PATCH",
+        body: { name },
+      }),
+    }),
   }),
 });
 
@@ -45,4 +55,5 @@ export const {
   useAddParticipantsMutation,
   useRemoveParticipantMutation,
   usePromoteAdminMutation,
+  useRenameGroupMutation,
 } = groupsApi;
