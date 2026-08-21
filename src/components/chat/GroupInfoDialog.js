@@ -12,6 +12,7 @@ export function GroupInfoDialog({
   onAddMembers,
   isAddingMembers,
   onRemoveMember,
+  onPromoteAdmin,
   onLeaveGroup,
 }) {
   const isAdmin = conversation.admins.includes(currentUserId);
@@ -20,6 +21,7 @@ export function GroupInfoDialog({
   const [isAdding, setIsAdding] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [removingId, setRemovingId] = useState(null);
+  const [promotingId, setPromotingId] = useState(null);
   const [isLeaving, setIsLeaving] = useState(false);
 
   async function handleAdd() {
@@ -35,6 +37,12 @@ export function GroupInfoDialog({
     setRemovingId(userId);
     await onRemoveMember(userId);
     setRemovingId(null);
+  }
+
+  async function handlePromote(userId) {
+    setPromotingId(userId);
+    await onPromoteAdmin(userId);
+    setPromotingId(null);
   }
 
   async function handleLeave() {
@@ -67,7 +75,8 @@ export function GroupInfoDialog({
         <div className="mt-4 max-h-48 overflow-y-auto rounded-lg border border-border">
           {conversation.participants.map((member) => {
             const isSelf = member._id === currentUserId;
-            const canRemove = isAdmin && !isSelf;
+            const memberIsAdmin = conversation.admins.includes(member._id);
+            const canManage = isAdmin && !isSelf;
 
             return (
               <div key={member._id} className="flex items-center gap-2.5 border-b border-border px-3 py-2.5 last:border-b-0">
@@ -76,17 +85,34 @@ export function GroupInfoDialog({
                   <p className="truncate text-sm font-medium text-foreground">{isSelf ? `${member.name} (you)` : member.name}</p>
                   <p className="truncate text-xs text-muted-foreground">{member.phone}</p>
                 </div>
-                {conversation.admins.includes(member._id) && (
+                {memberIsAdmin && (
                   <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground">
                     Admin
                   </span>
                 )}
-                {canRemove && (
+                {canManage && !memberIsAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => handlePromote(member._id)}
+                    disabled={promotingId === member._id}
+                    aria-label={`Make ${member.name} admin`}
+                    title="Make admin"
+                    className="shrink-0 rounded-lg p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                  >
+                    {promotingId === member._id ? (
+                      <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    ) : (
+                      <PromoteIcon />
+                    )}
+                  </button>
+                )}
+                {canManage && (
                   <button
                     type="button"
                     onClick={() => handleRemove(member._id)}
                     disabled={removingId === member._id}
                     aria-label={`Remove ${member.name}`}
+                    title="Remove"
                     className="shrink-0 rounded-lg p-1 text-muted-foreground hover:bg-secondary hover:text-destructive disabled:opacity-50"
                   >
                     {removingId === member._id ? (
@@ -154,6 +180,15 @@ export function GroupInfoDialog({
         </div>
       </div>
     </div>
+  );
+}
+
+function PromoteIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 19V5" />
+      <path d="M5 12l7-7 7 7" />
+    </svg>
   );
 }
 

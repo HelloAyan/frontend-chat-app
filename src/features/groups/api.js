@@ -28,7 +28,21 @@ export const groupsApi = createApi({
         method: "DELETE",
       }),
     }),
+    // admin-only (403 otherwise, verified live). promoting someone who's
+    // already an admin is a harmless no-op, not an error.
+    promoteAdmin: builder.mutation({
+      query: ({ conversationId, userId }) => ({
+        url: `/conversations/${conversationId}/admins`,
+        method: "POST",
+        body: { userId },
+      }),
+    }),
   }),
 });
 
-export const { useCreateGroupMutation, useAddParticipantsMutation, useRemoveParticipantMutation } = groupsApi;
+export const {
+  useCreateGroupMutation,
+  useAddParticipantsMutation,
+  useRemoveParticipantMutation,
+  usePromoteAdminMutation,
+} = groupsApi;

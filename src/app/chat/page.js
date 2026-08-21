@@ -10,7 +10,12 @@ import { useCurrentUser } from "@/features/auth/hooks";
 import { useGetConversationsQuery, useStartConversationMutation, conversationsApi } from "@/features/conversations/api";
 import { useGetMessagesInfiniteQuery, useSendMessageMutation } from "@/features/messages/api";
 import { useMessageSocket } from "@/features/messages/hooks";
-import { useCreateGroupMutation, useAddParticipantsMutation, useRemoveParticipantMutation } from "@/features/groups/api";
+import {
+  useCreateGroupMutation,
+  useAddParticipantsMutation,
+  useRemoveParticipantMutation,
+  usePromoteAdminMutation,
+} from "@/features/groups/api";
 import { getTokenCookie } from "@/lib/cookies";
 import { cn } from "@/lib/cn";
 
@@ -31,6 +36,7 @@ export default function ChatPage() {
   const [createGroup, { isLoading: isCreatingGroup }] = useCreateGroupMutation();
   const [addParticipants, { isLoading: isAddingMembers }] = useAddParticipantsMutation();
   const [removeParticipant] = useRemoveParticipantMutation();
+  const [promoteAdmin] = usePromoteAdminMutation();
   const [sendMessage] = useSendMessageMutation();
   const dispatch = useDispatch();
 
@@ -199,6 +205,17 @@ export default function ChatPage() {
     }
   }
 
+  async function handlePromoteAdmin(userId) {
+    if (!activeConversation) return;
+
+    try {
+      const updated = await promoteAdmin({ conversationId: activeConversation._id, userId }).unwrap();
+      patchConversation(activeConversation._id, { admins: updated.admins });
+    } catch (err) {
+      toast.error(err.message || "Couldn't promote that member, please try again.");
+    }
+  }
+
   async function handleLeaveGroup() {
     if (!activeConversation || !currentUser) return;
     const conversationId = activeConversation._id;
@@ -292,6 +309,7 @@ export default function ChatPage() {
         onAddMembers={handleAddMembers}
         isAddingMembers={isAddingMembers}
         onRemoveMember={handleRemoveMember}
+        onPromoteAdmin={handlePromoteAdmin}
         onLeaveGroup={handleLeaveGroup}
         className={cn(!activeId && "hidden md:flex")}
       />

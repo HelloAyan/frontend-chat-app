@@ -23,6 +23,7 @@ export function ChatPanel({
   onAddMembers,
   isAddingMembers,
   onRemoveMember,
+  onPromoteAdmin,
   onLeaveGroup,
   className,
 }) {
@@ -56,6 +57,7 @@ export function ChatPanel({
           onAddMembers={onAddMembers}
           isAddingMembers={isAddingMembers}
           onRemoveMember={onRemoveMember}
+          onPromoteAdmin={onPromoteAdmin}
           onLeaveGroup={onLeaveGroup}
         />
       )}
