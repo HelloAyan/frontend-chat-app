@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { TOKEN_COOKIE_NAME } from "@/lib/cookies";
 
-const PUBLIC_ROUTES = ["/login"];
+// "/" is the marketing landing page: reachable without a session, same as
+// /login, but unlike /login it stays visible even when already signed in —
+// a visitor can always pull up the pitch on demand. Only /login itself
+// bounces a signed-in visitor straight to /chat.
+const PUBLIC_ROUTES = ["/login", "/"];
+const LOGIN_ROUTE = "/login";
 
 // this only checks that the session cookie exists, not that the JWT inside
 // it is still valid. verifying the signature would need the backend's
@@ -12,10 +17,6 @@ export function proxy(request) {
   const { pathname } = request.nextUrl;
   const hasSession = Boolean(request.cookies.get(TOKEN_COOKIE_NAME)?.value);
 
-  if (pathname === "/") {
-    return NextResponse.redirect(new URL(hasSession ? "/chat" : "/login", request.url));
-  }
-
   const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
 
   if (!hasSession && !isPublicRoute) {
@@ -24,7 +25,7 @@ export function proxy(request) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (hasSession && isPublicRoute) {
+  if (hasSession && pathname === LOGIN_ROUTE) {
     return NextResponse.redirect(new URL("/chat", request.url));
   }
 

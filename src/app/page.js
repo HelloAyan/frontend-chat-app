@@ -1,8 +1,11 @@
-import { redirect } from "next/navigation";
+import { LandingPage } from "@/components/landing/LandingPage";
 
-// middleware already routes "/" to either /login or /chat depending on the
-// session cookie before this ever renders. this just covers the edge case
-// of someone hitting the route in a context that skips middleware.
+export const metadata = {
+  title: "Threadly — Real-time chat for people and teams",
+  description:
+    "Connect instantly with people and teams through fast, reliable messaging built for one-to-one and group conversations.",
+};
+
 export default function Home() {
-  redirect("/login");
+  return <LandingPage />;
 }
