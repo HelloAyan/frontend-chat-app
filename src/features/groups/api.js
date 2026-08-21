@@ -19,7 +19,16 @@ export const groupsApi = createApi({
         body: { userIds },
       }),
     }),
+    // removing someone else needs admin (403 otherwise, verified live);
+    // passing your own id always works, that's how leaving a group works.
+    // returns the full, updated Conversation either way.
+    removeParticipant: builder.mutation({
+      query: ({ conversationId, userId }) => ({
+        url: `/conversations/${conversationId}/participants/${userId}`,
+        method: "DELETE",
+      }),
+    }),
   }),
 });
 
-export const { useCreateGroupMutation, useAddParticipantsMutation } = groupsApi;
+export const { useCreateGroupMutation, useAddParticipantsMutation, useRemoveParticipantMutation } = groupsApi;

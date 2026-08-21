@@ -10,7 +10,7 @@ import { useCurrentUser } from "@/features/auth/hooks";
 import { useGetConversationsQuery, useStartConversationMutation, conversationsApi } from "@/features/conversations/api";
 import { useGetMessagesInfiniteQuery, useSendMessageMutation } from "@/features/messages/api";
 import { useMessageSocket } from "@/features/messages/hooks";
-import { useCreateGroupMutation, useAddParticipantsMutation } from "@/features/groups/api";
+import { useCreateGroupMutation, useAddParticipantsMutation, useRemoveParticipantMutation } from "@/features/groups/api";
 import { getTokenCookie } from "@/lib/cookies";
 import { cn } from "@/lib/cn";
 
@@ -30,6 +30,7 @@ export default function ChatPage() {
   const [startConversation] = useStartConversationMutation();
   const [createGroup, { isLoading: isCreatingGroup }] = useCreateGroupMutation();
   const [addParticipants, { isLoading: isAddingMembers }] = useAddParticipantsMutation();
+  const [removeParticipant] = useRemoveParticipantMutation();
   const [sendMessage] = useSendMessageMutation();
   const dispatch = useDispatch();
 
@@ -170,6 +171,48 @@ export default function ChatPage() {
     }
   }
 
+  // drops a conversation from every place this component tracks it, used
+  // when leaving a group means it shouldn't show up here at all anymore
+  function removeConversationFromView(conversationId) {
+    dispatch(
+      conversationsApi.util.updateQueryData("getConversations", undefined, (draft) => {
+        const index = draft.findIndex((c) => c._id === conversationId);
+        if (index !== -1) draft.splice(index, 1);
+      }),
+    );
+    setLocalConversations((prev) => prev.filter((c) => c._id !== conversationId));
+    setMessagesByConversation((prev) => {
+      const next = { ...prev };
+      delete next[conversationId];
+      return next;
+    });
+  }
+
+  async function handleRemoveMember(userId) {
+    if (!activeConversation) return;
+
+    try {
+      const updated = await removeParticipant({ conversationId: activeConversation._id, userId }).unwrap();
+      patchConversation(activeConversation._id, { participants: updated.participants, admins: updated.admins });
+    } catch (err) {
+      toast.error(err.message || "Couldn't remove that member, please try again.");
+    }
+  }
+
+  async function handleLeaveGroup() {
+    if (!activeConversation || !currentUser) return;
+    const conversationId = activeConversation._id;
+
+    try {
+      await removeParticipant({ conversationId, userId: currentUser._id }).unwrap();
+      removeConversationFromView(conversationId);
+      setActiveId(null);
+      toast.success("You left the group");
+    } catch (err) {
+      toast.error(err.message || "Couldn't leave the group, please try again.");
+    }
+  }
+
   // idempotent by message id: a message this tab just sent over REST also
   // comes back over the socket a moment later (the server broadcasts every
   // new message, including the sender's own), so the second arrival needs
@@ -248,6 +291,8 @@ export default function ChatPage() {
         onSendMessage={handleSendMessage}
         onAddMembers={handleAddMembers}
         isAddingMembers={isAddingMembers}
+        onRemoveMember={handleRemoveMember}
+        onLeaveGroup={handleLeaveGroup}
         className={cn(!activeId && "hidden md:flex")}
       />
     </>

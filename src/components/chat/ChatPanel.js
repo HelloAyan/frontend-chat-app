@@ -22,6 +22,8 @@ export function ChatPanel({
   onSendMessage,
   onAddMembers,
   isAddingMembers,
+  onRemoveMember,
+  onLeaveGroup,
   className,
 }) {
   const [isGroupInfoOpen, setGroupInfoOpen] = useState(false);
@@ -53,6 +55,8 @@ export function ChatPanel({
           onClose={() => setGroupInfoOpen(false)}
           onAddMembers={onAddMembers}
           isAddingMembers={isAddingMembers}
+          onRemoveMember={onRemoveMember}
+          onLeaveGroup={onLeaveGroup}
         />
       )}
     </div>

@@ -5,12 +5,22 @@ import { MemberPicker } from "./MemberPicker";
 import { Avatar } from "@/components/shared/Avatar";
 import { Button } from "@/components/ui/Button";
 
-export function GroupInfoDialog({ conversation, currentUserId, onClose, onAddMembers, isAddingMembers }) {
+export function GroupInfoDialog({
+  conversation,
+  currentUserId,
+  onClose,
+  onAddMembers,
+  isAddingMembers,
+  onRemoveMember,
+  onLeaveGroup,
+}) {
   const isAdmin = conversation.admins.includes(currentUserId);
   const memberIds = conversation.participants.map((member) => member._id);
 
   const [isAdding, setIsAdding] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState([]);
+  const [removingId, setRemovingId] = useState(null);
+  const [isLeaving, setIsLeaving] = useState(false);
 
   async function handleAdd() {
     if (selectedUsers.length === 0) return;
@@ -19,6 +29,21 @@ export function GroupInfoDialog({ conversation, currentUserId, onClose, onAddMem
       setSelectedUsers([]);
       setIsAdding(false);
     }
+  }
+
+  async function handleRemove(userId) {
+    setRemovingId(userId);
+    await onRemoveMember(userId);
+    setRemovingId(null);
+  }
+
+  async function handleLeave() {
+    if (!window.confirm("Leave this group? You won't be able to see its messages anymore.")) return;
+    setIsLeaving(true);
+    await onLeaveGroup();
+    // no need to reset isLeaving on success: the dialog unmounts along with
+    // the rest of the panel once the active conversation is cleared
+    setIsLeaving(false);
   }
 
   return (
@@ -40,22 +65,40 @@ export function GroupInfoDialog({ conversation, currentUserId, onClose, onAddMem
         </div>
 
         <div className="mt-4 max-h-48 overflow-y-auto rounded-lg border border-border">
-          {conversation.participants.map((member) => (
-            <div key={member._id} className="flex items-center gap-2.5 border-b border-border px-3 py-2.5 last:border-b-0">
-              <Avatar name={member.name} size="sm" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-foreground">
-                  {member._id === currentUserId ? `${member.name} (you)` : member.name}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">{member.phone}</p>
+          {conversation.participants.map((member) => {
+            const isSelf = member._id === currentUserId;
+            const canRemove = isAdmin && !isSelf;
+
+            return (
+              <div key={member._id} className="flex items-center gap-2.5 border-b border-border px-3 py-2.5 last:border-b-0">
+                <Avatar name={member.name} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground">{isSelf ? `${member.name} (you)` : member.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">{member.phone}</p>
+                </div>
+                {conversation.admins.includes(member._id) && (
+                  <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground">
+                    Admin
+                  </span>
+                )}
+                {canRemove && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(member._id)}
+                    disabled={removingId === member._id}
+                    aria-label={`Remove ${member.name}`}
+                    className="shrink-0 rounded-lg p-1 text-muted-foreground hover:bg-secondary hover:text-destructive disabled:opacity-50"
+                  >
+                    {removingId === member._id ? (
+                      <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    ) : (
+                      <RemoveIcon />
+                    )}
+                  </button>
+                )}
               </div>
-              {conversation.admins.includes(member._id) && (
-                <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground">
-                  Admin
-                </span>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {isAdmin && (
@@ -96,8 +139,30 @@ export function GroupInfoDialog({ conversation, currentUserId, onClose, onAddMem
             )}
           </div>
         )}
+
+        <div className="mt-4 border-t border-border pt-4">
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full text-destructive hover:bg-destructive/10"
+            onClick={handleLeave}
+            disabled={isLeaving}
+            loading={isLeaving}
+          >
+            Leave group
+          </Button>
+        </div>
       </div>
     </div>
+  );
+}
+
+function RemoveIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 6 6 18" />
+      <path d="M6 6l12 12" />
+    </svg>
   );
 }
 
