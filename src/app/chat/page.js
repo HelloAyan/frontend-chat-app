@@ -3,18 +3,33 @@
 import { useMemo, useState } from "react";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { ChatPanel } from "@/components/chat/ChatPanel";
-import { CURRENT_USER, MOCK_USERS, MOCK_CONVERSATIONS, MOCK_MESSAGES } from "@/lib/mockChatData";
+import { useCurrentUser } from "@/features/auth/hooks";
+import { useGetConversationsQuery } from "@/features/conversations/api";
+import { MOCK_USERS } from "@/lib/mockChatData";
 import { cn } from "@/lib/cn";
 
-// Everything below is local state over mock data, just to get the UI right
-// first. Next step swaps this for TanStack Query (conversations/messages are
-// server data, same as auth) plus the socket for live updates. None of
-// src/components/chat should need to change for that, they only know about
-// the props they're given.
+// Starting a conversation, creating a group, and sending a message are
+// still mock/local (their own API steps haven't landed yet), so anything
+// created that way lives in localConversations until it does. It's merged
+// with the real fetched list below rather than replacing it.
 export default function ChatPage() {
-  const [conversations, setConversations] = useState(MOCK_CONVERSATIONS);
-  const [messagesByConversation, setMessagesByConversation] = useState(MOCK_MESSAGES);
+  const { data: currentUser } = useCurrentUser();
+  const {
+    data: fetchedConversations,
+    isLoading: isLoadingConversations,
+    isError: isConversationsError,
+    refetch: refetchConversations,
+  } = useGetConversationsQuery();
+
+  const [localConversations, setLocalConversations] = useState([]);
+  const [messagesByConversation, setMessagesByConversation] = useState({});
   const [activeId, setActiveId] = useState(null);
+
+  const conversations = useMemo(() => {
+    const fetchedIds = new Set((fetchedConversations ?? []).map((c) => c._id));
+    const stillLocal = localConversations.filter((c) => !fetchedIds.has(c._id));
+    return [...stillLocal, ...(fetchedConversations ?? [])];
+  }, [fetchedConversations, localConversations]);
 
   const activeConversation = conversations.find((c) => c._id === activeId) ?? null;
 
@@ -43,7 +58,7 @@ export default function ChatPage() {
       lastMessage: null,
       updatedAt: new Date().toISOString(),
     };
-    setConversations((prev) => [newConversation, ...prev]);
+    setLocalConversations((prev) => [newConversation, ...prev]);
     setMessagesByConversation((prev) => ({ ...prev, [newConversation._id]: [] }));
     setActiveId(newConversation._id);
   }
@@ -54,24 +69,24 @@ export default function ChatPage() {
       _id: `local-group-${Date.now()}`,
       type: "group",
       name,
-      createdBy: CURRENT_USER._id,
-      admins: [CURRENT_USER._id],
-      participants: [CURRENT_USER, ...members],
+      createdBy: currentUser?._id,
+      admins: [currentUser?._id],
+      participants: [currentUser, ...members],
       lastMessage: null,
       updatedAt: new Date().toISOString(),
     };
-    setConversations((prev) => [newGroup, ...prev]);
+    setLocalConversations((prev) => [newGroup, ...prev]);
     setMessagesByConversation((prev) => ({ ...prev, [newGroup._id]: [] }));
     setActiveId(newGroup._id);
   }
 
   function handleSendMessage(text) {
-    if (!activeConversation) return;
+    if (!activeConversation || !currentUser) return;
 
     const message = {
       _id: `local-msg-${Date.now()}`,
       conversation: activeConversation._id,
-      sender: CURRENT_USER._id,
+      sender: currentUser._id,
       text,
       createdAt: new Date().toISOString(),
     };
@@ -81,10 +96,10 @@ export default function ChatPage() {
       [activeConversation._id]: [...(prev[activeConversation._id] ?? []), message],
     }));
 
-    setConversations((prev) =>
+    setLocalConversations((prev) =>
       prev.map((c) =>
         c._id === activeConversation._id
-          ? { ...c, lastMessage: { text, sender: CURRENT_USER._id, createdAt: message.createdAt }, updatedAt: message.createdAt }
+          ? { ...c, lastMessage: { text, sender: currentUser._id, createdAt: message.createdAt }, updatedAt: message.createdAt }
           : c,
       ),
     );
@@ -95,8 +110,10 @@ export default function ChatPage() {
       <ChatSidebar
         conversations={conversations}
         activeId={activeId}
-        currentUserId={CURRENT_USER._id}
-        isLoading={false}
+        currentUserId={currentUser?._id}
+        isLoading={isLoadingConversations}
+        isError={isConversationsError}
+        onRetry={refetchConversations}
         users={MOCK_USERS}
         onSelectConversation={setActiveId}
         onStartConversation={handleStartConversation}
@@ -106,7 +123,7 @@ export default function ChatPage() {
       <ChatPanel
         conversation={activeConversation}
         messages={activeMessages}
-        currentUserId={CURRENT_USER._id}
+        currentUserId={currentUser?._id}
         isLoadingMessages={false}
         onBack={() => setActiveId(null)}
         onSendMessage={handleSendMessage}

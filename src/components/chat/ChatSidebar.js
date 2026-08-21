@@ -12,6 +12,8 @@ export function ChatSidebar({
   activeId,
   currentUserId,
   isLoading,
+  isError,
+  onRetry,
   users,
   onSelectConversation,
   onStartConversation,
@@ -33,6 +35,8 @@ export function ChatSidebar({
           currentUserId={currentUserId}
           onSelect={onSelectConversation}
           isLoading={isLoading}
+          isError={isError}
+          onRetry={onRetry}
         />
       </div>
 

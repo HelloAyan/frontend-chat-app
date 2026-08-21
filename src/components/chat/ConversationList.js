@@ -1,7 +1,8 @@
 import { ConversationListItem } from "./ConversationListItem";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { Button } from "@/components/ui/Button";
 
-export function ConversationList({ conversations, activeId, currentUserId, onSelect, isLoading }) {
+export function ConversationList({ conversations, activeId, currentUserId, onSelect, isLoading, isError, onRetry }) {
   if (isLoading) {
     return (
       <div className="flex flex-col gap-3 px-3 py-1">
@@ -14,6 +15,18 @@ export function ConversationList({ conversations, activeId, currentUserId, onSel
             </div>
           </div>
         ))}
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+        <p className="text-sm font-medium text-foreground">Couldn&rsquo;t load conversations</p>
+        <p className="text-xs text-muted-foreground">Check your connection and try again.</p>
+        <Button type="button" variant="secondary" onClick={onRetry} className="mt-1">
+          Retry
+        </Button>
       </div>
     );
   }

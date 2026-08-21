@@ -1,3 +1,5 @@
+import { getTokenCookie } from "./cookies";
+
 const API_BASE_URL = "https://frontend-task-chatapp.onrender.com/api";
 
 class ApiError extends Error {
@@ -45,4 +47,18 @@ export async function apiFetch(path, { method = "GET", body, token, params } = {
   }
 
   return data;
+}
+
+// Adapts apiFetch to RTK Query's baseQuery contract, so every feature's
+// createApi() goes through this instead of duplicating the same adapter or
+// reaching for RTK Query's own fetchBaseQuery.
+export async function rtkBaseQuery(args) {
+  const { url, method = "GET", body, params } = typeof args === "string" ? { url: args } : args;
+
+  try {
+    const data = await apiFetch(url, { method, body, params, token: getTokenCookie() });
+    return { data };
+  } catch (err) {
+    return { error: { status: err.status, message: err.message, code: err.code } };
+  }
 }
