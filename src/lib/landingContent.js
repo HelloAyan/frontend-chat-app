@@ -162,6 +162,85 @@ export const featureSectionContent = {
 };
 
 /**
+ * @typedef {Object} ConversationParticipant
+ * @property {string} id
+ * @property {string} name
+ * @property {string} avatarUrl - live/remote avatar image URL
+ * @property {boolean} [isOnline]
+ */
+
+/**
+ * @typedef {Object} ConversationPreviewMessage
+ * @property {string} id
+ * @property {string} from - sender display name, used for group previews where the speaker isn't implied by side alone
+ * @property {"incoming"|"outgoing"} direction
+ * @property {string} text
+ * @property {string} time - pre-formatted display time, e.g. "9:42 AM"
+ */
+
+/**
+ * @typedef {Object} ConversationTypeCard
+ * @property {string} id
+ * @property {"direct"|"group"} type
+ * @property {string} title
+ * @property {string} description
+ * @property {string} metadata - short supporting label, e.g. "Just between you two" or "6 members"
+ * @property {ConversationParticipant[]} participants - avatars shown on the card (the other person for "direct", a handful of members for "group")
+ * @property {number} [totalParticipantCount] - "group" only; drives the "+N" overflow chip when there are more members than shown avatars
+ * @property {ConversationPreviewMessage[]} previewMessages
+ */
+
+/**
+ * @typedef {Object} ConversationTypesContent
+ * @property {string} eyebrow
+ * @property {string} title
+ * @property {string} description
+ * @property {ConversationTypeCard[]} cards
+ */
+
+/** @type {ConversationTypesContent} */
+export const conversationTypesContent = {
+  eyebrow: "Two ways to connect",
+  title: "Conversations that fit how you talk.",
+  description: "Whether it's just the two of you or the whole team, every conversation gets the same real-time experience.",
+  cards: [
+    {
+      id: "direct",
+      type: "direct",
+      title: "Private conversations",
+      description: "Keep one-to-one conversations focused and personal.",
+      metadata: "Just between you two",
+      participants: [
+        { id: "u1", name: "Nusrat Jahan", avatarUrl: "https://i.pravatar.cc/150?img=47", isOnline: true },
+      ],
+      previewMessages: [
+        { id: "pm1", from: "Nusrat Jahan", direction: "incoming", text: "Are you around for a quick call?", time: "9:41 AM" },
+        { id: "pm2", from: "You", direction: "outgoing", text: "Yep, calling you now.", time: "9:42 AM" },
+      ],
+    },
+    {
+      id: "group",
+      type: "group",
+      title: "Built for group conversations",
+      description: "Bring your team together in one shared conversation.",
+      metadata: "6 members",
+      totalParticipantCount: 6,
+      participants: [
+        { id: "u2", name: "Karim Hasan", avatarUrl: "https://i.pravatar.cc/150?img=12", isOnline: true },
+        { id: "u3", name: "Tania Islam", avatarUrl: "https://i.pravatar.cc/150?img=32", isOnline: false },
+        { id: "u4", name: "Rahim Ahmed", avatarUrl: "https://i.pravatar.cc/150?img=15", isOnline: true },
+        { id: "u5", name: "Farah Chowdhury", avatarUrl: "https://i.pravatar.cc/150?img=25", isOnline: false },
+      ],
+      previewMessages: [
+        { id: "pm3", from: "Karim Hasan", direction: "incoming", text: "Deploy is done ✅", time: "2:14 PM" },
+        { id: "pm4", from: "Tania Islam", direction: "incoming", text: "Nice, checking the staging link now.", time: "2:15 PM" },
+        { id: "pm5", from: "You", direction: "outgoing", text: "Great work, team 🎉", time: "2:16 PM" },
+      ],
+    },
+  ],
+};
+
+/**
  * @typedef {Object} ShowcaseMessage
  * @property {string} id
  * @property {"incoming"|"outgoing"} direction

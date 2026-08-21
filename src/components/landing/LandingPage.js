@@ -1,11 +1,13 @@
 import { Header } from "./Header";
 import { Hero } from "./Hero";
 import { ChatPreviewSection } from "./ChatPreviewSection";
+import { ConversationTypesSection } from "./ConversationTypesSection";
 import { RealtimeShowcase } from "./RealtimeShowcase";
 import { FeatureSection } from "./FeatureSection";
 import {
   heroContent,
   chatPreviewContent,
+  conversationTypesContent,
   realtimeShowcaseContent,
   featureSectionContent,
 } from "@/lib/landingContent";
@@ -19,6 +21,7 @@ export function LandingPage() {
       <Header />
       <Hero {...heroContent} />
       <ChatPreviewSection {...chatPreviewContent} />
+      <ConversationTypesSection {...conversationTypesContent} />
       <RealtimeShowcase {...realtimeShowcaseContent} />
       <FeatureSection {...featureSectionContent} />
     </main>
