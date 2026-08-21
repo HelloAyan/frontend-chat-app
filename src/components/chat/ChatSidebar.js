@@ -14,7 +14,7 @@ export function ChatSidebar({
   isLoading,
   isError,
   onRetry,
-  groupMemberOptions,
+  isCreatingGroup,
   onSelectConversation,
   onStartConversation,
   onCreateGroup,
@@ -48,11 +48,11 @@ export function ChatSidebar({
 
       {isGroupDialogOpen && (
         <NewGroupDialog
-          users={groupMemberOptions}
+          isSubmitting={isCreatingGroup}
           onClose={() => setGroupDialogOpen(false)}
-          onCreate={(payload) => {
-            onCreateGroup(payload);
-            setGroupDialogOpen(false);
+          onCreate={async (payload) => {
+            const created = await onCreateGroup(payload);
+            if (created) setGroupDialogOpen(false);
           }}
         />
       )}

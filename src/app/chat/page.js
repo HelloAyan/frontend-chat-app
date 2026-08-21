@@ -10,16 +10,15 @@ import { useCurrentUser } from "@/features/auth/hooks";
 import { useGetConversationsQuery, useStartConversationMutation, conversationsApi } from "@/features/conversations/api";
 import { useGetMessagesInfiniteQuery, useSendMessageMutation } from "@/features/messages/api";
 import { useMessageSocket } from "@/features/messages/hooks";
-import { MOCK_USERS } from "@/lib/mockChatData";
+import { useCreateGroupMutation } from "@/features/groups/api";
 import { getTokenCookie } from "@/lib/cookies";
 import { cn } from "@/lib/cn";
 
-// Creating a group and sending a message are still mock/local (their own
-// API steps haven't landed yet), so anything created that way lives in
-// localConversations/messagesByConversation until it does. Both get merged
-// with real fetched data below rather than replacing it. A "local-group-"
-// id is the only kind of conversation that's still entirely mock; anything
-// else (fetched, or started for real in step 3) fetches its real history.
+// Everything a user does here (start a chat, create a group, send a
+// message) hits the real API. Anything just created client side lives in
+// localConversations/messagesByConversation only until the next fetch
+// brings back the authoritative version, at which point the merges below
+// drop the local copy automatically by matching on the server's own id.
 export default function ChatPage() {
   const { data: currentUser } = useCurrentUser();
   const {
@@ -29,6 +28,7 @@ export default function ChatPage() {
     refetch: refetchConversations,
   } = useGetConversationsQuery();
   const [startConversation] = useStartConversationMutation();
+  const [createGroup, { isLoading: isCreatingGroup }] = useCreateGroupMutation();
   const [sendMessage] = useSendMessageMutation();
   const dispatch = useDispatch();
 
@@ -43,7 +43,6 @@ export default function ChatPage() {
   }, [fetchedConversations, localConversations]);
 
   const activeConversation = conversations.find((c) => c._id === activeId) ?? null;
-  const isMockOnlyConversation = activeConversation?._id.startsWith("local-group-") ?? true;
 
   const {
     data: messagesPages,
@@ -53,7 +52,7 @@ export default function ChatPage() {
     hasNextPage: hasMoreOlderMessages,
     fetchNextPage: loadOlderMessages,
     refetch: refetchMessages,
-  } = useGetMessagesInfiniteQuery(isMockOnlyConversation ? skipToken : activeConversation._id);
+  } = useGetMessagesInfiniteQuery(activeConversation ? activeConversation._id : skipToken);
 
   const activeMessages = useMemo(() => {
     if (!activeConversation) return [];
@@ -69,13 +68,12 @@ export default function ChatPage() {
     const fetched = messagesPages
       ? Array.from(new Map(messagesPages.pages.flatMap((page) => page.messages).map((m) => [m._id, m])).values()).reverse()
       : [];
-    // a message just sent through appendMessage() below lives here under
-    // its real id until the next full refetch brings it back through
-    // `fetched` too, drop the local copy once that happens so it isn't
-    // shown twice
+    // a message sitting only in the local overlay (just sent, or delivered
+    // over the socket) drops out here once the same id shows up in a real
+    // fetch, so it isn't shown twice
     const fetchedIds = new Set(fetched.map((m) => m._id));
     const stillLocalOnly = localOnly.filter((m) => !fetchedIds.has(m._id));
-    const raw = isMockOnlyConversation ? localOnly : [...fetched, ...stillLocalOnly];
+    const raw = [...fetched, ...stillLocalOnly];
 
     if (activeConversation.type !== "group") return raw;
 
@@ -83,7 +81,7 @@ export default function ChatPage() {
     // to show above other people's messages
     const nameById = new Map(activeConversation.participants.map((p) => [p._id, p.name]));
     return raw.map((message) => ({ ...message, senderName: nameById.get(message.sender) }));
-  }, [activeConversation, isMockOnlyConversation, messagesPages, messagesByConversation]);
+  }, [activeConversation, messagesPages, messagesByConversation]);
 
   async function handleStartConversation(user) {
     const existing = conversations.find((c) => c.type === "direct" && c.participant._id === user._id);
@@ -112,21 +110,19 @@ export default function ChatPage() {
     }
   }
 
-  function handleCreateGroup({ name, participantIds }) {
-    const members = MOCK_USERS.filter((user) => participantIds.includes(user._id));
-    const newGroup = {
-      _id: `local-group-${Date.now()}`,
-      type: "group",
-      name,
-      createdBy: currentUser?._id,
-      admins: [currentUser?._id],
-      participants: [currentUser, ...members],
-      lastMessage: null,
-      updatedAt: new Date().toISOString(),
-    };
-    setLocalConversations((prev) => [newGroup, ...prev]);
-    setMessagesByConversation((prev) => ({ ...prev, [newGroup._id]: [] }));
-    setActiveId(newGroup._id);
+  async function handleCreateGroup({ name, participantIds }) {
+    try {
+      // unlike POST /conversations, this one already returns the full
+      // Conversation shape, nothing needs filling in
+      const group = await createGroup({ name, participantIds }).unwrap();
+      setLocalConversations((prev) => [group, ...prev]);
+      setMessagesByConversation((prev) => ({ ...prev, [group._id]: [] }));
+      setActiveId(group._id);
+      return true;
+    } catch (err) {
+      toast.error(err.message || "Couldn't create the group, please try again.");
+      return false;
+    }
   }
 
   // updates wherever this conversation's preview line lives: the RTK Query
@@ -186,17 +182,6 @@ export default function ChatPage() {
   async function handleSendMessage(text) {
     if (!activeConversation || !currentUser) return;
 
-    if (isMockOnlyConversation) {
-      appendMessage(activeConversation._id, {
-        _id: `local-msg-${Date.now()}`,
-        conversation: activeConversation._id,
-        sender: currentUser._id,
-        text,
-        createdAt: new Date().toISOString(),
-      });
-      return;
-    }
-
     try {
       const result = await sendMessage({ conversationId: activeConversation._id, text }).unwrap();
       if (!result) {
@@ -221,7 +206,7 @@ export default function ChatPage() {
         isLoading={isLoadingConversations}
         isError={isConversationsError}
         onRetry={refetchConversations}
-        groupMemberOptions={MOCK_USERS}
+        isCreatingGroup={isCreatingGroup}
         onSelectConversation={setActiveId}
         onStartConversation={handleStartConversation}
         onCreateGroup={handleCreateGroup}
@@ -231,10 +216,10 @@ export default function ChatPage() {
         conversation={activeConversation}
         messages={activeMessages}
         currentUserId={currentUser?._id}
-        isLoadingMessages={!isMockOnlyConversation && isLoadingMessages}
-        isMessagesError={!isMockOnlyConversation && isMessagesError}
+        isLoadingMessages={isLoadingMessages}
+        isMessagesError={isMessagesError}
         onRetryMessages={refetchMessages}
-        hasMoreOlderMessages={!isMockOnlyConversation && hasMoreOlderMessages}
+        hasMoreOlderMessages={hasMoreOlderMessages}
         isLoadingOlderMessages={isLoadingOlderMessages}
         onLoadOlderMessages={loadOlderMessages}
         onBack={() => setActiveId(null)}

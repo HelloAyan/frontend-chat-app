@@ -3,6 +3,7 @@ import { authApi } from "@/features/auth/api";
 import { conversationsApi } from "@/features/conversations/api";
 import { usersApi } from "@/features/users/api";
 import { messagesApi } from "@/features/messages/api";
+import { groupsApi } from "@/features/groups/api";
 
 // RTK Query slices go in here alongside any plain client-state slices
 // (there aren't any of the latter yet, e.g. active conversation selection
@@ -13,6 +14,7 @@ export const store = configureStore({
     [conversationsApi.reducerPath]: conversationsApi.reducer,
     [usersApi.reducerPath]: usersApi.reducer,
     [messagesApi.reducerPath]: messagesApi.reducer,
+    [groupsApi.reducerPath]: groupsApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -20,5 +22,6 @@ export const store = configureStore({
       conversationsApi.middleware,
       usersApi.middleware,
       messagesApi.middleware,
+      groupsApi.middleware,
     ),
 });
