@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { dateDividerLabel, isSameDay } from "@/lib/formatMessageTime";
 import { cn } from "@/lib/cn";
 
-// how close to the bottom counts as "still anchored" — a few px of slack so
+// how close to the bottom counts as "still anchored", a few px of slack so
 // a stray scroll wheel tick doesn't unpin the view
 const BOTTOM_THRESHOLD_PX = 80;
 
@@ -18,7 +18,7 @@ export function MessageList({ messages, currentUserId, isGroup, isLoading }) {
   const isPinnedToBottom = useRef(true);
   const [hasNewMessages, setHasNewMessages] = useState(false);
 
-  // jump to the bottom the moment a conversation opens — no smooth scroll,
+  // jump to the bottom the moment a conversation opens, no smooth scroll,
   // that would just look like the page is animating for no reason
   useEffect(() => {
     scrollToBottom("auto");

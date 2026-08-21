@@ -1,5 +1,5 @@
 import { Geist, Geist_Mono } from "next/font/google";
-import { StoreProvider } from "@/store/StoreProvider";
+import { AppProviders } from "@/providers/AppProviders";
 import { Toaster } from "@/components/ui/Toaster";
 import "./globals.css";
 
@@ -25,10 +25,10 @@ export default function RootLayout({ children }) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <StoreProvider>
+        <AppProviders>
           {children}
           <Toaster />
-        </StoreProvider>
+        </AppProviders>
       </body>
     </html>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Avatar } from "./Avatar";
+import { Avatar } from "@/components/shared/Avatar";
 
 // filters the given user list client-side for now; once the API layer is
 // wired in this becomes a debounced call to GET /users/search?q=

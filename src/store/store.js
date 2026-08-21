@@ -1,8 +1,12 @@
 import { configureStore } from "@reduxjs/toolkit";
-import authReducer from "./authSlice";
+import { authApi } from "@/features/auth/api";
 
+// RTK Query slices go in here alongside any plain client-state slices
+// (there aren't any of the latter yet, e.g. active conversation selection
+// will land here once chat is wired to the real API).
 export const store = configureStore({
   reducer: {
-    auth: authReducer,
+    [authApi.reducerPath]: authApi.reducer,
   },
+  middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(authApi.middleware),
 });

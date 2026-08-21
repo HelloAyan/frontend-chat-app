@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useDispatch, useSelector } from "react-redux";
 import toast from "react-hot-toast";
-import { login } from "@/store/authSlice";
+import { useLogin } from "../hooks";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { PhoneInput } from "@/components/ui/PhoneInput";
@@ -31,8 +30,7 @@ function validate({ phone, dialCode, name }) {
 
 export function LoginForm() {
   const router = useRouter();
-  const dispatch = useDispatch();
-  const isSubmitting = useSelector((state) => state.auth.status === "loading");
+  const { login, isPending } = useLogin();
 
   const [phone, setPhone] = useState("");
   const [dialCode, setDialCode] = useState("");
@@ -52,11 +50,11 @@ export function LoginForm() {
     if (Object.keys(errors).length > 0) return;
 
     try {
-      const result = await dispatch(login({ phone: `+${phone}`, name: name.trim() })).unwrap();
+      const result = await login({ phone: `+${phone}`, name: name.trim() });
       toast.success(`Welcome, ${result.user.name.split(" ")[0]}`);
       router.push("/chat");
-    } catch (message) {
-      toast.error(typeof message === "string" ? message : "Couldn't log you in, please try again.");
+    } catch (err) {
+      toast.error(err.message || "Couldn't log you in, please try again.");
     }
   }
 
@@ -91,8 +89,8 @@ export function LoginForm() {
           autoComplete="name"
         />
 
-        <Button type="submit" loading={isSubmitting} className="mt-2 w-full">
-          {isSubmitting ? "Logging in..." : "Continue"}
+        <Button type="submit" loading={isPending} className="mt-2 w-full">
+          {isPending ? "Logging in..." : "Continue"}
         </Button>
       </form>
 
@@ -100,7 +98,7 @@ export function LoginForm() {
           screen, so this is here to keep first-time users from being confused
           about where the "sign up" button went */}
       <p className="mt-5 text-center text-xs text-muted-foreground">
-        New here? Just enter your number and name, we'll set up your account automatically.
+        New here? Just enter your number and name, we&rsquo;ll set up your account automatically.
       </p>
     </div>
   );

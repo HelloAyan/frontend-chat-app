@@ -1,6 +1,6 @@
 const API_BASE_URL = "https://frontend-task-chatapp.onrender.com/api";
 
-export class ApiError extends Error {
+class ApiError extends Error {
   constructor(message, { status, code } = {}) {
     super(message);
     this.name = "ApiError";
@@ -11,7 +11,8 @@ export class ApiError extends Error {
 
 // Thin wrapper around fetch for the given backend. Handles the base URL,
 // the auth header, and unwraps the { error: { message, code } } shape the
-// API returns on failure so callers can just catch ApiError.
+// API returns on failure so callers can just catch ApiError. Every
+// feature's api.js goes through this instead of calling fetch directly.
 export async function apiFetch(path, { method = "GET", body, token, params } = {}) {
   const url = new URL(`${API_BASE_URL}${path}`);
 

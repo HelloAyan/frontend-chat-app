@@ -1,4 +1,4 @@
-import { Avatar } from "./Avatar";
+import { Avatar } from "@/components/shared/Avatar";
 
 export function ChatHeader({ conversation, onBack }) {
   const displayName = conversation.type === "group" ? conversation.name : conversation.participant.name;

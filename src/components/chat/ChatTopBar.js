@@ -1,21 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useDispatch, useSelector } from "react-redux";
-import { logout } from "@/store/authSlice";
-import { Avatar } from "./Avatar";
+import { useCurrentUser, useLogout } from "@/features/auth/hooks";
+import { Avatar } from "@/components/shared/Avatar";
 
 export function ChatTopBar() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const dispatch = useDispatch();
-  const router = useRouter();
-  const userName = useSelector((state) => state.auth.user?.name ?? "");
-
-  function handleLogout() {
-    dispatch(logout());
-    router.push("/login");
-  }
+  const { data: user } = useCurrentUser();
+  const logout = useLogout();
+  const userName = user?.name ?? "";
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-4">
@@ -38,7 +31,7 @@ export function ChatTopBar() {
             <div className="absolute right-0 top-full z-20 mt-1.5 w-40 rounded-lg border border-border bg-card p-1 shadow-lg">
               <button
                 type="button"
-                onClick={handleLogout}
+                onClick={logout}
                 className="w-full rounded-md px-3 py-2 text-left text-sm text-destructive hover:bg-secondary"
               >
                 Log out

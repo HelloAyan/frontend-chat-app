@@ -7,9 +7,10 @@ import { CURRENT_USER, MOCK_USERS, MOCK_CONVERSATIONS, MOCK_MESSAGES } from "@/l
 import { cn } from "@/lib/cn";
 
 // Everything below is local state over mock data, just to get the UI right
-// first. Next step swaps this for redux (conversations/messages slices) and
-// the real REST + socket calls — none of src/components/chat should need to
-// change for that, they only know about the props they're given.
+// first. Next step swaps this for TanStack Query (conversations/messages are
+// server data, same as auth) plus the socket for live updates. None of
+// src/components/chat should need to change for that, they only know about
+// the props they're given.
 export default function ChatPage() {
   const [conversations, setConversations] = useState(MOCK_CONVERSATIONS);
   const [messagesByConversation, setMessagesByConversation] = useState(MOCK_MESSAGES);

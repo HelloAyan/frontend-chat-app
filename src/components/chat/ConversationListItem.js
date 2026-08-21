@@ -1,4 +1,4 @@
-import { Avatar } from "./Avatar";
+import { Avatar } from "@/components/shared/Avatar";
 import { formatConversationTime } from "@/lib/formatMessageTime";
 import { cn } from "@/lib/cn";
 

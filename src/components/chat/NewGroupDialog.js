@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Avatar } from "./Avatar";
+import { Avatar } from "@/components/shared/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { cn } from "@/lib/cn";
 
 // a group needs the creator plus at least 2 others to actually be a group
-// (the API treats 3+ members as "group", 2 as "direct") — see docs/openapi.yaml
+// (the API treats 3+ members as "group", 2 as "direct", see docs/openapi.yaml)
 const MIN_OTHER_MEMBERS = 2;
 
 export function NewGroupDialog({ users, onClose, onCreate }) {
